@@ -1,5 +1,4 @@
 STATIQ
-STATIQ
 Product Requirements Document
 Capstone Project — Cycle 4  |  Demo Day: March 18, 2026
 
