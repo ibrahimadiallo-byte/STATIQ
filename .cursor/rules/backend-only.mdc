@@ -1,0 +1,22 @@
+---
+description: Work only on backend; do not modify the pair's frontend code
+alwaysApply: true
+---
+
+# Backend / Frontend Split
+
+- **You (the user) work only on the backend.** Your pair owns the frontend.
+- **Do not edit, refactor, or suggest changes to your pair's frontend code.**
+
+## Frontend (do not touch)
+
+- `src/` — React app (components, App.tsx, main.tsx, styles)
+- `index.html`
+- Frontend config: `vite.config.ts`, `postcss.config.mjs`, Tailwind/CSS setup
+
+When adding APIs or backend features, only add or change backend code and minimal integration points (e.g. env vars or API base URLs) if the user explicitly asks. Do not rewrite or modify React components, UI, or frontend structure.
+
+## Backend (your scope)
+
+- Any backend or server code (e.g. `server/`, `api/`, `backend/` or similar)
+- API routes, data layer, auth, and server config
