@@ -1,17 +1,27 @@
 import OpenAI from 'openai';
 import { supabase } from './supabase.js';
 
+const AI_TIMEOUT_MS = 9000; // Under Vercel 10s limit
+
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
+function withTimeout(promise, ms, fallback) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('AI request timed out')), ms)
+    ),
+  ]).catch((err) => {
+    if (err.message === 'AI request timed out') return fallback;
+    throw err;
+  });
+}
+
 /**
  * Generate a 2-sentence plain-language scouting summary (PRD: AI insight report).
- * Saves to insight_reports and returns the text.
- * @param {string} playerId - UUID
- * @param {object} player - Player row (name, position, team_name, etc.)
- * @param {object[]} stats - Player stats rows (goals, assists, xg, xa, season, etc.)
- * @returns {Promise<{ summary_text: string, report_id: string }>}
+ * Saves to insight_reports and returns the text. Times out after 9s (Vercel-safe).
  */
 export async function generateAndCacheInsight(playerId, player, stats) {
   if (!openai) throw new Error('OPENAI_API_KEY is required for AI insights');
@@ -29,7 +39,7 @@ export async function generateAndCacheInsight(playerId, player, stats) {
     minutes_played: latest?.minutes_played,
   };
 
-  const { data: completion } = await openai.chat.completions.create({
+  const completionPromise = openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
       {
@@ -44,6 +54,15 @@ export async function generateAndCacheInsight(playerId, player, stats) {
     ],
     max_tokens: 150,
   });
+
+  const completion = await withTimeout(
+    completionPromise,
+    AI_TIMEOUT_MS,
+    null
+  );
+  if (!completion) {
+    throw new Error('Insight temporarily unavailable (timeout). Try again shortly.');
+  }
 
   const summary_text =
     completion?.choices?.[0]?.message?.content?.trim() || 'No summary generated.';
@@ -98,7 +117,7 @@ export async function getOrCreateInsight(playerId, generateIfMissing = false) {
 export async function generateComparisonNarrative(player1, player2, deltas) {
   if (!openai) return 'Comparison narrative unavailable (missing OPENAI_API_KEY).';
 
-  const { data: completion } = await openai.chat.completions.create({
+  const completionPromise = openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
       {
@@ -114,5 +133,11 @@ export async function generateComparisonNarrative(player1, player2, deltas) {
     max_tokens: 120,
   });
 
+  const completion = await withTimeout(
+    completionPromise,
+    AI_TIMEOUT_MS,
+    null
+  );
+  if (!completion) return 'Comparison narrative temporarily unavailable (timeout).';
   return completion?.choices?.[0]?.message?.content?.trim() || 'No comparison narrative.';
 }
