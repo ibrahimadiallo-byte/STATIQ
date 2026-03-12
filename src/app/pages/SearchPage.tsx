@@ -76,6 +76,9 @@ export function SearchPage({
   const hasError = errorMessage != null;
   const showEmpty =
     !isLoading && !hasError && results.length === 0 && debouncedQuery.length > 0;
+  const queryTooShort = (query.trim().length > 0 && query.trim().length < 2);
+  const showShortHint = showEmpty && queryTooShort;
+  const displayQuery = (query.trim() || debouncedQuery).slice(0, 50);
 
   const handleSelect = (player: Player) => {
     onSelectPlayer(player.id);
@@ -116,7 +119,7 @@ export function SearchPage({
                 <div className="p-4 text-sm text-white/80">
                   <p>{errorMessage}</p>
                   <p className="mt-1 text-white/50 text-xs">
-                    Try a different name (e.g. Bellingham, Mbappe).
+                    Try a full surname (e.g. Bellingham, Mbappe). If this is the live site, check that API keys are set in Vercel.
                   </p>
                 </div>
               )}
@@ -151,7 +154,11 @@ export function SearchPage({
               )}
               {!isLoading && !hasError && showEmpty && (
                 <div className="p-4 text-sm text-white/60">
-                  No players found for &quot;{debouncedQuery}&quot;. Keep typing or try another name.
+                  {showShortHint ? (
+                    <>Type at least 2 characters to search (e.g. Mbappe, Salah, Ronaldo).</>
+                  ) : (
+                    <>No players found for &quot;{displayQuery}&quot;. Try a full surname or another spelling.</>
+                  )}
                 </div>
               )}
             </div>
@@ -179,7 +186,11 @@ export function SearchPage({
 
       {!showDropdown && showEmpty && (
         <div className="mt-4 rounded-2xl bg-white/5 px-4 py-5 text-sm text-white/70">
-          No players found for &quot;{debouncedQuery}&quot;.
+          {showShortHint ? (
+            <>Type at least 2 characters to search (e.g. Mbappe, Salah, Ronaldo).</>
+          ) : (
+            <>No players found for &quot;{displayQuery}&quot;. Try a full surname or another spelling.</>
+          )}
         </div>
       )}
 

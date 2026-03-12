@@ -141,7 +141,7 @@ export async function searchCandidates(searchTerm) {
 
   const key = getRapidKey();
 
-  // 1. DB: any existing by name (case-insensitive) — return as candidates
+  // 1. DB: any existing by name (optional cache — app works with empty DB; API is primary)
   const { data: byName, error: selectError } = await supabase
     .from('players')
     .select('*')
@@ -151,17 +151,17 @@ export async function searchCandidates(searchTerm) {
   if (selectError) throw new Error(`Supabase lookup failed: ${selectError.message}`);
   const fromDb = byName || [];
 
-  // 2. API: only call when 3+ chars (API requirement); otherwise we already have DB suggestions above
+  // 2. API-first: call external API for 2+ chars so search works even when DB has no players
   let apiList = [];
-  if (trimmed.length >= 3) {
+  if (trimmed.length >= 2) {
     apiList = await fetchProfilesFromApi(key, trimmed);
     if (apiList.length === 0 && trimmed.includes(' ')) {
       const surname = trimmed.split(/\s+/).pop();
-      if (surname.length >= 3) apiList = await fetchProfilesFromApi(key, surname);
+      if (surname.length >= 2) apiList = await fetchProfilesFromApi(key, surname);
     }
     if (apiList.length === 0 && trimmed.includes(' ')) {
       const firstName = trimmed.split(/\s+/)[0];
-      if (firstName.length >= 3) apiList = await fetchProfilesFromApi(key, firstName);
+      if (firstName.length >= 2) apiList = await fetchProfilesFromApi(key, firstName);
     }
     // Fallback: optional first-name → surname map for a few common first names (e.g. cristiano→Ronaldo)
     if (apiList.length === 0 && !trimmed.includes(' ')) {
@@ -177,7 +177,7 @@ export async function searchCandidates(searchTerm) {
         : [trimmed];
       const season = CURRENT_SEASON;
       for (const term of searchTerms) {
-        if (term.length < 3) continue;
+        if (term.length < 2) continue;
         for (const leagueId of FALLBACK_LEAGUES) {
           const byLeague = await fetchPlayersByLeague(key, term, leagueId, season);
           if (byLeague.length) {
