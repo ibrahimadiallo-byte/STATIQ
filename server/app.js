@@ -1,9 +1,16 @@
 import express from 'express';
 import cors from 'cors';
-import { searchOrIngestPlayer } from './playerService.js';
+import { searchCandidates, getPlayerByRapidId } from './playerService.js';
 import { getUnifiedProfile } from './profileService.js';
 import { ensureProfileFresh } from './refreshService.js';
 import { getOrCreateInsight, generateComparisonNarrative } from './aiService.js';
+import {
+  getLiveFixtures,
+  getFixturesToday,
+  getTeam,
+  getStandings,
+  getPlayerStatsByRapidId,
+} from './rapidApiService.js';
 import { supabase } from './supabase.js';
 
 const app = express();
@@ -27,7 +34,7 @@ app.get('/api/health', (_, res) => {
 
 /**
  * GET /api/players/search?q=...
- * PRD: player search → unified profile (aggregated key stats in one view).
+ * Returns all candidates (stable ID plan). Frontend picks one then GET /api/players/:id for full profile.
  */
 app.get('/api/players/search', async (req, res) => {
   try {
@@ -35,18 +42,43 @@ app.get('/api/players/search', async (req, res) => {
     if (!q) {
       return res.status(400).json({ error: 'Query parameter "q" is required' });
     }
-    const { player, source } = await searchOrIngestPlayer(q);
-    await ensureProfileFresh(player.id, await getUnifiedProfile(player.id));
-    const profile = await getUnifiedProfile(player.id);
-    const insight = await getOrCreateInsight(player.id, true);
-    return res.json({
-      source,
-      player: profile.player,
-      stats: profile.stats,
-      insight: insight ? { summary_text: insight.summary_text } : null,
-    });
+    const { candidates } = await searchCandidates(q);
+    return res.json({ candidates });
   } catch (err) {
+    const msg = err?.message || '';
+    if (msg.includes('Player not found') || msg.includes('not found in API')) {
+      return res.json({ candidates: [] });
+    }
     return sendError(res, err, 'Search failed');
+  }
+});
+
+/**
+ * GET /api/players/by-rapid-id/:rapidId
+ * Stable ID: exact lookup by rapid_api_id. Returns our player (uuid) or 404.
+ */
+app.get('/api/players/by-rapid-id/:rapidId', async (req, res) => {
+  try {
+    const player = await getPlayerByRapidId(req.params.rapidId);
+    if (!player) return res.status(404).json({ error: 'Player not found' });
+    return res.json(player);
+  } catch (err) {
+    return sendError(res, err, 'Lookup failed');
+  }
+});
+
+/**
+ * GET /api/players/rapid/:rapidId/stats?season=...
+ * Cached player stats by RapidAPI player id (live data plan). Must be before /api/players/:id.
+ */
+app.get('/api/players/rapid/:rapidId/stats', async (req, res) => {
+  try {
+    const season = req.query.season?.trim() || null;
+    const data = await getPlayerStatsByRapidId(req.params.rapidId, season);
+    const list = Array.isArray(data) ? data : [data];
+    return res.json({ stats: list, last_updated: new Date().toISOString() });
+  } catch (err) {
+    return sendError(res, err, 'Player stats failed');
   }
 });
 
@@ -150,6 +182,48 @@ app.patch('/api/players/:id', async (req, res) => {
     return res.json(data);
   } catch (err) {
     return sendError(res, err, 'Update failed');
+  }
+});
+
+/** Live data (cached) — BACKEND.md Live Data + Stable ID Plan */
+app.get('/api/fixtures/live', async (req, res) => {
+  try {
+    const data = await getLiveFixtures();
+    return res.json({ fixtures: data, last_updated: new Date().toISOString() });
+  } catch (err) {
+    return sendError(res, err, 'Live fixtures failed');
+  }
+});
+
+app.get('/api/fixtures/today', async (req, res) => {
+  try {
+    const date = req.query.date?.trim() || null;
+    const data = await getFixturesToday(date);
+    return res.json({ fixtures: data, date: date || new Date().toISOString().slice(0, 10), last_updated: new Date().toISOString() });
+  } catch (err) {
+    return sendError(res, err, 'Fixtures today failed');
+  }
+});
+
+app.get('/api/teams/:teamId', async (req, res) => {
+  try {
+    const data = await getTeam(req.params.teamId);
+    const team = Array.isArray(data) ? data[0] : data;
+    if (!team) return res.status(404).json({ error: 'Team not found' });
+    return res.json({ team, last_updated: new Date().toISOString() });
+  } catch (err) {
+    return sendError(res, err, 'Team lookup failed');
+  }
+});
+
+app.get('/api/standings', async (req, res) => {
+  try {
+    const league = req.query.league?.trim() || null;
+    const season = req.query.season?.trim() || null;
+    const data = await getStandings(league, season);
+    return res.json({ standings: data, last_updated: new Date().toISOString() });
+  } catch (err) {
+    return sendError(res, err, 'Standings failed');
   }
 });
 

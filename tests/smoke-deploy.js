@@ -44,8 +44,8 @@ async function fetchJSON(url) {
   }
 
   const search = await fetchJSON(`${base}/api/players/search?q=mbappe`);
-  if (search.status === 200 && (search.body?.player || search.body?.error)) {
-    ok('GET /api/players/search returns 200 with player or error');
+  if (search.status === 200 && (Array.isArray(search.body?.candidates) || search.body?.error)) {
+    ok('GET /api/players/search returns 200 with candidates or error');
   } else if (search.status === 503) {
     ok('GET /api/players/search returns 503 (env not set on Vercel — add env vars)');
   } else {

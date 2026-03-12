@@ -1,31 +1,105 @@
-const keyStats = [
-  { label: "Goals", value: "18", delta: "+3", highlight: true },
-  { label: "Assists", value: "11", delta: "+2" },
-  { label: "Minutes", value: "2,310", delta: "90%" },
-  { label: "Rating", value: "7.9", delta: "+0.4", highlight: true },
-];
-
-const advancedStats = [
-  { label: "xG", value: "15.4", sub: "0.62 / 90" },
-  { label: "xA", value: "7.2", sub: "0.29 / 90" },
-  { label: "Prog Passes", value: "4.8", sub: "+12% YoY" },
-  { label: "Shots / 90", value: "3.7", sub: "+0.4 / 90" },
-];
+import { useEffect, useState } from "react";
+import { getPlayerProfile, type ProfileResponse, type PlayerStat } from "@/app/lib/api";
 
 type ProfilePageProps = {
-  playerName?: string;
+  playerId: string | null;
 };
 
-export function ProfilePage({ playerName = "Kylian Mbappe" }: ProfilePageProps) {
+export function ProfilePage({ playerId }: ProfilePageProps) {
+  const [data, setData] = useState<ProfileResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!playerId) {
+      setData(null);
+      setError(null);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getPlayerProfile(playerId)
+      .then((res) => {
+        if (!cancelled) setData(res);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [playerId]);
+
+  if (!playerId) {
+    return (
+      <section className="pb-6">
+        <div className="rounded-3xl bg-[#111730] p-5 md:p-6 shadow-lg text-center text-white/70">
+          Search for a player to view their profile.
+        </div>
+      </section>
+    );
+  }
+
+  if (loading) {
+    return (
+      <section className="pb-6">
+        <div className="rounded-3xl bg-[#111730] p-5 md:p-6 shadow-lg animate-pulse">
+          <div className="h-16 w-16 rounded-2xl bg-white/10" />
+          <div className="mt-4 h-4 w-32 bg-white/10 rounded" />
+          <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="rounded-2xl p-4 bg-white/5 h-20" />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="pb-6">
+        <div className="rounded-3xl bg-[#2b1630] p-5 md:p-6 shadow-lg text-sm text-white/80">
+          {error}
+        </div>
+      </section>
+    );
+  }
+
+  if (!data) return null;
+
+  const { player, stats, insight } = data;
+  const s: PlayerStat | undefined = stats?.[0];
+
+  const keyStats = [
+    { label: "Goals", value: String(s?.goals ?? 0) },
+    { label: "Assists", value: String(s?.assists ?? 0) },
+    { label: "Minutes", value: s?.minutes_played != null ? s.minutes_played.toLocaleString() : "—" },
+    { label: "xG", value: s?.xg != null ? String(Number(s.xg)) : "—", highlight: true },
+    { label: "xA", value: s?.xa != null ? String(Number(s.xa)) : "—", highlight: true },
+  ];
+
   return (
     <section className="pb-6">
       <div className="rounded-3xl bg-[#111730] p-5 md:p-6 shadow-lg">
         <div className="flex items-center gap-4">
-          <div className="h-16 w-16 rounded-2xl bg-white/10" />
+          {player.photo_url ? (
+            <img
+              src={player.photo_url}
+              alt=""
+              className="h-16 w-16 rounded-2xl object-cover bg-white/10"
+            />
+          ) : (
+            <div className="h-16 w-16 rounded-2xl bg-white/10" />
+          )}
           <div>
-            <p className="text-xl font-semibold leading-tight">{playerName}</p>
+            <p className="text-xl font-semibold leading-tight">{player.name}</p>
             <p className="text-xs text-white/60">
-              Real Madrid · FW · France
+              {player.team_name ?? "—"} · {player.position ?? "—"}
             </p>
           </div>
         </div>
@@ -42,10 +116,7 @@ export function ProfilePage({ playerName = "Kylian Mbappe" }: ProfilePageProps) 
               <p className="text-xs uppercase tracking-[0.25em] text-white/60">
                 {stat.label}
               </p>
-              <div className="mt-2 flex items-baseline justify-between">
-                <p className="text-lg font-semibold">{stat.value}</p>
-                <span className="text-xs text-emerald-300">{stat.delta}</span>
-              </div>
+              <p className="mt-2 text-lg font-semibold">{stat.value}</p>
             </div>
           ))}
         </div>
@@ -53,22 +124,9 @@ export function ProfilePage({ playerName = "Kylian Mbappe" }: ProfilePageProps) 
 
       <div className="mt-6 rounded-3xl bg-[#0f152d] p-5 md:p-6 shadow-lg">
         <p className="text-sm font-semibold uppercase tracking-[0.25em] text-white/60">
-          Advanced metrics
+          Season
         </p>
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-          {advancedStats.map((stat) => (
-            <div
-              key={stat.label}
-              className="rounded-2xl bg-white/5 p-3"
-            >
-              <p className="text-xs uppercase tracking-[0.25em] text-white/60">
-                {stat.label}
-              </p>
-              <p className="text-base font-semibold">{stat.value}</p>
-              <p className="text-xs text-white/50">{stat.sub}</p>
-            </div>
-          ))}
-        </div>
+        <p className="mt-2 text-white/80">{s?.season ?? "—"}</p>
       </div>
 
       <div className="mt-6 rounded-3xl bg-gradient-to-br from-[#1520A6]/70 via-[#1b2a7a] to-[#0f152d] p-5 md:p-6">
@@ -76,9 +134,7 @@ export function ProfilePage({ playerName = "Kylian Mbappe" }: ProfilePageProps) 
           Insight report
         </p>
         <p className="mt-3 text-sm text-white/80 leading-relaxed">
-          Mbappe is in elite form with strong shot volume and improved
-          creativity. His xG trend suggests consistency, and his chance
-          creation has ticked up compared to last season.
+          {insight?.summary_text ?? "No AI insight generated yet."}
         </p>
       </div>
     </section>

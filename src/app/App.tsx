@@ -14,7 +14,7 @@ import { SchedulePage } from "./pages/SchedulePage";
 export default function App() {
   const [activeTab, setActiveTab] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedPlayer, setSelectedPlayer] = useState("Kylian Mbappe");
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [activeBottom, setActiveBottom] = useState(0);
   const [activeView, setActiveView] = useState<
     "home" | "explore" | "search" | "profile" | "compare" | "news" | "leagues" | "schedule"
@@ -65,16 +65,16 @@ export default function App() {
             <SearchPage
               query={searchQuery}
               onQueryChange={setSearchQuery}
-              onSelectPlayer={(playerName) => {
-                setSelectedPlayer(playerName);
+              onSelectPlayer={(playerId) => {
+                setSelectedPlayerId(playerId);
                 setActiveView("profile");
               }}
-              isLoading={false}
-              hasError={false}
             />
           )}
-          {activeView === "profile" && <ProfilePage playerName={selectedPlayer} />}
-          {activeView === "compare" && <ComparePage />}
+          {activeView === "profile" && <ProfilePage playerId={selectedPlayerId} />}
+          {activeView === "compare" && (
+            <ComparePage preselectedPlayerId={selectedPlayerId} />
+          )}
           {activeView === "news" && <NewsPage />}
           {activeView === "leagues" && <LeaguesPage />}
           {activeView === "schedule" && <SchedulePage />}

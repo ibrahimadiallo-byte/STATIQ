@@ -26,10 +26,16 @@ npm run server
 The API listens on **http://localhost:3000** (or `PORT` if set). Endpoints:
 
 - `GET /api/health` — health check
-- `GET /api/players/search?q=...` — search or ingest player, returns unified profile
+- `GET /api/players/search?q=...` — search; returns `{ candidates: [...] }` (stable ID; pick one then `GET /api/players/:id`)
+- `GET /api/players/by-rapid-id/:rapidId` — lookup by RapidAPI player id
 - `GET /api/players/:id` — player profile (player + stats + insight)
+- `GET /api/players/rapid/:rapidId/stats?season=...` — cached player stats by RapidAPI id
 - `GET /api/compare?p1=uuid&p2=uuid` — comparison with deltas + AI narrative
 - `PATCH /api/players/:id` — update e.g. `understat_id` (body: `{ "understat_id": "..." }`)
+- `GET /api/fixtures/live` — live fixtures (cached ~45s)
+- `GET /api/fixtures/today?date=YYYY-MM-DD` — fixtures for a day (cached)
+- `GET /api/teams/:teamId` — team by RapidAPI team id (cached)
+- `GET /api/standings?league=...&season=...` — league standings (cached)
 
 ## Required environment variables
 
@@ -186,8 +192,10 @@ Include these fields in player/team responses where possible:
 
 ### 5) Minimal tasks checklist
 
-1. Add `/players/by-rapid-id/:id` endpoint.
-2. Update search to return multiple candidates.
-3. Add fixtures/live + fixtures/today endpoints.
-4. Add cached player stats endpoint.
-5. Add cache layer + TTL strategy.
+1. ✅ Add `/api/players/by-rapid-id/:rapidId` endpoint.
+2. ✅ Update search to return multiple candidates (`GET /api/players/search?q=...` → `{ candidates: [...] }`).
+3. ✅ Add `GET /api/fixtures/live` and `GET /api/fixtures/today` (cached).
+4. ✅ Add `GET /api/players/rapid/:rapidId/stats?season=...` (cached).
+5. ✅ Add cache layer (`server/cache.js`) + TTL strategy (`server/rapidApiService.js`).
+
+**Also implemented:** `GET /api/teams/:teamId`, `GET /api/standings?league=...&season=...`.
