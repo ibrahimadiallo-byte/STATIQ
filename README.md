@@ -147,3 +147,9 @@ If the product is live by June 2026, World Cup search volume and user engagement
 
 STATIQ — Capstone PRD  |  Cycle 4  |  March 2026
 
+---
+
+## Backend
+
+To run the API locally or deploy: see **[docs/BACKEND.md](docs/BACKEND.md)** for `npm run server`, required env vars, and Vercel deploy steps.
+
