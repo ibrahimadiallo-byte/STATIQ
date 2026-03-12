@@ -23,6 +23,16 @@ CREATE TABLE player_stats (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- External / multi-source stats payloads (PRD: aggregate from multiple data sources)
+CREATE TABLE external_stats (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  player_id UUID REFERENCES players(id) ON DELETE CASCADE,
+  source TEXT NOT NULL,         -- e.g. 'understat', 'fbref', 'transfermarkt'
+  season TEXT,
+  payload JSONB NOT NULL,       -- raw stats blob from the source
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- AI Narrative Storage
 CREATE TABLE insight_reports (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

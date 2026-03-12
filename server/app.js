@@ -10,6 +10,9 @@ import {
   getTeam,
   getStandings,
   getPlayerStatsByRapidId,
+  getWorldCupStandings,
+  getWorldCupFixtures,
+  getWorldCupTeams,
 } from './rapidApiService.js';
 import { supabase } from './supabase.js';
 
@@ -97,6 +100,7 @@ app.get('/api/players/:id', async (req, res) => {
     return res.json({
       player: profile.player,
       stats: profile.stats,
+      externalStats: profile.externalStats ?? null,
       insight: summary != null ? { summary_text: summary } : null,
     });
   } catch (err) {
@@ -224,6 +228,41 @@ app.get('/api/standings', async (req, res) => {
     return res.json({ standings: data, last_updated: new Date().toISOString() });
   } catch (err) {
     return sendError(res, err, 'Standings failed');
+  }
+});
+
+/** World Cup 2026 — PRD: national teams, group stage, fixtures */
+app.get('/api/world-cup/standings', async (req, res) => {
+  try {
+    const league = req.query.league?.trim() || null;
+    const season = req.query.season?.trim() || null;
+    const data = await getWorldCupStandings(league || undefined, season || undefined);
+    return res.json({ standings: data, last_updated: new Date().toISOString() });
+  } catch (err) {
+    return sendError(res, err, 'World Cup standings failed');
+  }
+});
+
+app.get('/api/world-cup/fixtures', async (req, res) => {
+  try {
+    const league = req.query.league?.trim() || null;
+    const season = req.query.season?.trim() || null;
+    const next = req.query.next?.trim() ? parseInt(req.query.next, 10) : null;
+    const data = await getWorldCupFixtures(league || undefined, season || undefined, next);
+    return res.json({ fixtures: data, last_updated: new Date().toISOString() });
+  } catch (err) {
+    return sendError(res, err, 'World Cup fixtures failed');
+  }
+});
+
+app.get('/api/world-cup/teams', async (req, res) => {
+  try {
+    const league = req.query.league?.trim() || null;
+    const season = req.query.season?.trim() || null;
+    const data = await getWorldCupTeams(league || undefined, season || undefined);
+    return res.json({ teams: data, last_updated: new Date().toISOString() });
+  } catch (err) {
+    return sendError(res, err, 'World Cup teams failed');
   }
 });
 

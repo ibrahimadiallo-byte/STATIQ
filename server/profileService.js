@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { getExternalStatsForPlayer } from './externalStatsService.js';
 
 /**
  * Get a unified profile for the PRD: one clean view (player + stats + insight).
@@ -21,6 +22,8 @@ export async function getUnifiedProfile(playerId) {
     .eq('player_id', playerId)
     .order('season', { ascending: false });
 
+  const externalStats = await getExternalStatsForPlayer(playerId);
+
   const { data: insights } = await supabase
     .from('insight_reports')
     .select('*')
@@ -31,6 +34,7 @@ export async function getUnifiedProfile(playerId) {
   return {
     player,
     stats: stats && stats.length ? stats : null,
+    externalStats: externalStats && externalStats.length ? externalStats : null,
     insight: insights && insights[0] ? insights[0] : null,
   };
 }

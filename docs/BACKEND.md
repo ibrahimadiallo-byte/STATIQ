@@ -36,6 +36,9 @@ The API listens on **http://localhost:3000** (or `PORT` if set). Endpoints:
 - `GET /api/fixtures/today?date=YYYY-MM-DD` — fixtures for a day (cached)
 - `GET /api/teams/:teamId` — team by RapidAPI team id (cached)
 - `GET /api/standings?league=...&season=...` — league standings (cached)
+- `GET /api/world-cup/standings?league=...&season=...` — World Cup 2026 group standings (default league=1, season=2026)
+- `GET /api/world-cup/fixtures?league=...&season=...&next=N` — World Cup fixtures (optional `next` for next N)
+- `GET /api/world-cup/teams?league=...&season=...` — national teams in the competition
 
 ## Required environment variables
 
@@ -48,13 +51,15 @@ Set these in `.env` (local) or in Vercel Project Settings (deploy):
 | `OPENAI_API_KEY` | OpenAI API key (for AI insights and comparison narrative) |
 | `RAPIDAPI_KEY` | RapidAPI key (for API-Football player search/ingest) |
 
+Optional: `UNDERSTAT_API_BASE` — URL of a proxy that returns Understat player JSON (by `understat_id`); `WORLD_CUP_LEAGUE_ID` (default `1`), `WORLD_CUP_SEASON` (default `2026`) for World Cup endpoints.
+
 If `SUPABASE_URL` or `SUPABASE_ANON_KEY` are missing, the API returns **503** with a clear error. Same for AI routes when `OPENAI_API_KEY` is missing.
 
 ## When to deploy to Vercel
 
 **Deploy only when all APIs are ready.** Use this checklist before connecting the repo to Vercel:
 
-- [ ] **Supabase** — Project created, schema applied (`players`, `player_stats`, `insight_reports`). You have `SUPABASE_URL` and `SUPABASE_ANON_KEY` from project settings.
+- [ ] **Supabase** — Project created, schema applied (`players`, `player_stats`, `insight_reports`, `external_stats`). You have `SUPABASE_URL` and `SUPABASE_ANON_KEY` from project settings.
 - [ ] **RapidAPI** — Subscribed to API-Football (or equivalent). You have `RAPIDAPI_KEY` and search/ingest works (e.g. locally with `npm run server` + search).
 - [ ] **OpenAI** — API key created. You have `OPENAI_API_KEY` and AI insight/generation works locally.
 - [ ] **Local test** — `npm run server` runs without env errors; at least `GET /api/health` returns `{"ok":true}` and, if keys are set, search returns a unified profile.

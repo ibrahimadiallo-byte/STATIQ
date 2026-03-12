@@ -100,3 +100,46 @@ export async function getPlayerStatsByRapidId(rapidId, season) {
     TTL.PLAYER_STATS_MS
   );
 }
+
+// World Cup 2026 — PRD: national teams, group stage, fixtures. League id from env or default (1 = FIFA World Cup in API-Football).
+const WORLD_CUP_LEAGUE_ID = parseInt(process.env.WORLD_CUP_LEAGUE_ID || '1', 10) || 1;
+const WORLD_CUP_SEASON = parseInt(process.env.WORLD_CUP_SEASON || '2026', 10) || 2026;
+
+/**
+ * World Cup standings (groups). Cached like league standings.
+ */
+export async function getWorldCupStandings(leagueId = WORLD_CUP_LEAGUE_ID, season = WORLD_CUP_SEASON) {
+  return request(
+    '/standings',
+    { league: leagueId, season },
+    `worldcup:standings:${leagueId}:${season}`,
+    TTL.STANDINGS_MS
+  );
+}
+
+/**
+ * World Cup fixtures for the competition. Optional: next=N for next N fixtures.
+ */
+export async function getWorldCupFixtures(leagueId = WORLD_CUP_LEAGUE_ID, season = WORLD_CUP_SEASON, next = null) {
+  const params = { league: leagueId, season };
+  if (next != null) params.next = next;
+  const key = `worldcup:fixtures:${leagueId}:${season}:${next ?? 'all'}`;
+  return request(
+    '/fixtures',
+    params,
+    key,
+    TTL.FIXTURES_TODAY_MS
+  );
+}
+
+/**
+ * Teams in the World Cup competition (national teams). From /teams?league=...&season=...
+ */
+export async function getWorldCupTeams(leagueId = WORLD_CUP_LEAGUE_ID, season = WORLD_CUP_SEASON) {
+  return request(
+    '/teams',
+    { league: leagueId, season },
+    `worldcup:teams:${leagueId}:${season}`,
+    TTL.TEAM_MS
+  );
+}

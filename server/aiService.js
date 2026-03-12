@@ -21,12 +21,26 @@ function withTimeout(promise, ms, fallback) {
 
 /**
  * Generate a 2-sentence plain-language scouting summary (PRD: AI insight report).
- * Saves to insight_reports and returns the text. Times out after 9s (Vercel-safe).
+ * Uses core stats plus any external_stats rows (multi-source) and saves to insight_reports.
+ * Times out after 9s (Vercel-safe).
  */
-export async function generateAndCacheInsight(playerId, player, stats) {
+export async function generateAndCacheInsight(
+  playerId,
+  player,
+  stats,
+  externalStats = null
+) {
   if (!openai) throw new Error('OPENAI_API_KEY is required for AI insights');
 
   const latest = Array.isArray(stats) && stats.length ? stats[0] : null;
+   // Trim external stats so prompt stays small but multi-source-aware.
+  const externalSummary = Array.isArray(externalStats)
+    ? externalStats.slice(0, 3).map((row) => ({
+        source: row.source,
+        season: row.season,
+        payload: row.payload,
+      }))
+    : null;
   const payload = {
     name: player?.name,
     position: player?.position,
@@ -37,6 +51,7 @@ export async function generateAndCacheInsight(playerId, player, stats) {
     xg: latest?.xg,
     xa: latest?.xa,
     minutes_played: latest?.minutes_played,
+    externalStats: externalSummary,
   };
 
   const completionPromise = openai.chat.completions.create({
@@ -102,7 +117,8 @@ export async function getOrCreateInsight(playerId, generateIfMissing = false) {
   const { summary_text } = await generateAndCacheInsight(
     playerId,
     profile.player,
-    profile.stats
+    profile.stats,
+    profile.externalStats
   );
   return { summary_text };
 }
