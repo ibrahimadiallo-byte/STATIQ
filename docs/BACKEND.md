@@ -96,3 +96,98 @@ curl -s "https://YOUR_APP.vercel.app/api/players/search?q=mbappe"
 ## API & data sources
 
 See [docs/SOURCES.md](SOURCES.md) for API references and latest docs links.
+
+---
+
+## Live Data + Stable ID Plan (RapidAPI)
+
+This is the minimal plan to guarantee near‑real‑time data and consistent player/team identity.
+
+### 1) Stable ID mapping (must‑have)
+
+**Goal:** remove name‑only lookups and ensure deterministic identity.
+
+**Add endpoints**
+
+- `GET /api/players/by-rapid-id/:rapidId` — exact lookup by `rapid_api_id`.
+- `GET /api/players/search?q=...` — return **all** candidates (not just first) with `rapid_api_id`, team, league, position.
+
+**DB fields (players)**
+
+- `rapid_api_id` (already used)
+- `photo_url` (already used)
+- optional: `team_rapid_id`, `league_rapid_id` for clean joins
+
+**Logic change**
+
+- Do not rely on `.ilike('name', ...)` as the primary lookup.
+- Use `rapid_api_id` once known.
+- If multiple matches, return list and let frontend choose.
+
+### 2) Live data ingestion (near‑real‑time)
+
+**Goal:** keep stats and fixtures fresh.
+
+**Add backend endpoints (RapidAPI pass‑through, cached)**
+
+- `GET /api/fixtures/live`
+- `GET /api/fixtures/today`
+- `GET /api/teams/:teamId`
+- `GET /api/standings?league=...&season=...`
+- `GET /api/players/:rapidId/stats?season=...`
+
+**Refresh strategy**
+
+- On‑demand + short cache TTL (recommended first)
+- Optional cron refresh every 5–15 minutes for live fixtures and tracked players
+
+### 3) Caching / rate‑limit protection
+
+**Goal:** avoid RapidAPI throttling while keeping data fresh.
+
+Suggested cache keys:
+
+- `fixtures:live`
+- `fixtures:today`
+- `player:stats:${rapidId}:${season}`
+
+Suggested TTLs:
+
+- Live fixtures: 30–60 seconds
+- Player stats: 5–10 minutes
+- Standings: 1–6 hours
+
+### 4) Response shape for frontend (images + freshness)
+
+Include these fields in player/team responses where possible:
+
+```json
+{
+  "player": {
+    "id": "uuid",
+    "rapid_api_id": 276,
+    "name": "Kylian Mbappe",
+    "team_name": "Real Madrid",
+    "photo_url": "https://media.api-sports.io/football/players/276.png"
+  },
+  "team": {
+    "rapid_api_id": 541,
+    "name": "Real Madrid",
+    "logo_url": "https://media.api-sports.io/football/teams/541.png"
+  },
+  "league": {
+    "rapid_api_id": 140,
+    "name": "La Liga",
+    "logo_url": "https://media.api-sports.io/football/leagues/140.png"
+  },
+  "last_updated": "2026-03-11T18:12:00Z"
+}
+```
+
+### 5) Minimal tasks checklist
+
+1. Add `/players/by-rapid-id/:id` endpoint.
+2. Update search to return multiple candidates.
+3. Add fixtures/live + fixtures/today endpoints.
+4. Add cached player stats endpoint.
+5. Add cache layer + TTL strategy.
