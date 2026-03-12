@@ -64,9 +64,19 @@ Once all are ready, add the same env vars in Vercel and deploy.
 
 After deploy, your API is available at `https://<your-project>.vercel.app/api/...`.
 
+## Backend Phase 2: Deploy readiness
+
+When you deploy (see “Deploy to Vercel” above), run the smoke test:
+
+```bash
+DEPLOY_URL=https://YOUR_APP.vercel.app node tests/smoke-deploy.js
+```
+
+Expect: health 200 and `{ ok: true }`; search 200 (with profile) or 503 (if env vars not set on Vercel).
+
 ## Phase 4: Deploy & verify (smoke test)
 
-After your first deploy, run these against your `.vercel.app` URL (replace `YOUR_APP`):
+After your first deploy, you can also run these manually against your `.vercel.app` URL (replace `YOUR_APP`):
 
 ```bash
 # 1. Health
