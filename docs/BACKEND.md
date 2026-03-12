@@ -83,6 +83,8 @@ After deploy, your API is available at `https://<your-project>.vercel.app/api/..
 
 3. **Check API** — `GET https://YOUR_APP.vercel.app/api/health` should return `{"ok":true}`. Then try `GET https://YOUR_APP.vercel.app/api/players/search?q=Ronaldo`; if you get 503, env vars are missing or invalid.
 
+4. **League fallback** — If the profiles search returns nothing (e.g. full names or names the API doesn’t match), the backend tries the API with league + season across major leagues (Premier League, La Liga, Serie A, Bundesliga, Ligue 1), using the search term (and for multi-word queries, surname then first name). This improves results for any player in those leagues, not just specific names.
+
 ## Backend Phase 2: Deploy readiness
 
 When you deploy (see “Deploy to Vercel” above), run the smoke test:

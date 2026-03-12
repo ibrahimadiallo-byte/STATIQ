@@ -88,11 +88,18 @@ export async function getPlayerByRapidId(rapidId) {
   return data;
 }
 
-/**
- * Search: return all candidates from API (and DB matches by name). Uses rapid_api_id for stable identity.
- * @param {string} searchTerm
- * @returns {Promise<{ candidates: object[] }>}
- */
+/** Current season for league-based search fallback. */
+const CURRENT_SEASON = new Date().getFullYear();
+
+/** Major leagues to try when profiles search returns nothing (API-Football league ids). */
+const FALLBACK_LEAGUES = [
+  39,  // Premier League
+  140, // La Liga
+  135, // Serie A
+  78,  // Bundesliga
+  61,  // Ligue 1
+];
+
 async function fetchProfilesFromApi(apiKey, search) {
   const { data, status } = await axios.get(
     `${RAPIDAPI_BASE}/players/profiles`,
@@ -103,6 +110,26 @@ async function fetchProfilesFromApi(apiKey, search) {
         'X-RapidAPI-Host': RAPIDAPI_HOST,
       },
       validateStatus: (s) => s < 500,
+    }
+  );
+  return status === 200 && data?.response?.length ? data.response : [];
+}
+
+/**
+ * Fallback: search players by league + season (more reliable when profiles search is empty).
+ * GET /v3/players?league=&season=&search=
+ */
+async function fetchPlayersByLeague(apiKey, search, leagueId, season) {
+  const { data, status } = await axios.get(
+    `${RAPIDAPI_BASE}/players`,
+    {
+      params: { league: leagueId, season, search },
+      headers: {
+        'X-RapidAPI-Key': apiKey,
+        'X-RapidAPI-Host': RAPIDAPI_HOST,
+      },
+      validateStatus: (s) => s < 500,
+      timeout: 10000,
     }
   );
   return status === 200 && data?.response?.length ? data.response : [];
@@ -136,12 +163,30 @@ export async function searchCandidates(searchTerm) {
       const firstName = trimmed.split(/\s+/)[0];
       if (firstName.length >= 3) apiList = await fetchProfilesFromApi(key, firstName);
     }
-    // Fallback: common first-name → surname so "cristiano" finds Cristiano Ronaldo
+    // Fallback: optional first-name → surname map for a few common first names (e.g. cristiano→Ronaldo)
     if (apiList.length === 0 && !trimmed.includes(' ')) {
       const lower = trimmed.toLowerCase();
       const fallbacks = { cristiano: 'Ronaldo', kylian: 'Mbappe', erling: 'Haaland', mohamed: 'Salah', lionel: 'Messi' };
       const fallback = fallbacks[lower];
       if (fallback) apiList = await fetchProfilesFromApi(key, fallback);
+    }
+    // Fallback: search by league + season (profiles often empty for full names; /players with league returns more)
+    if (apiList.length === 0) {
+      const searchTerms = trimmed.includes(' ')
+        ? [trimmed.split(/\s+/).pop(), trimmed.split(/\s+/)[0]]
+        : [trimmed];
+      const season = CURRENT_SEASON;
+      for (const term of searchTerms) {
+        if (term.length < 3) continue;
+        for (const leagueId of FALLBACK_LEAGUES) {
+          const byLeague = await fetchPlayersByLeague(key, term, leagueId, season);
+          if (byLeague.length) {
+            apiList = byLeague;
+            break;
+          }
+        }
+        if (apiList.length) break;
+      }
     }
   }
   const seenRapidIds = new Set(fromDb.map((p) => p.rapid_api_id).filter(Boolean));
