@@ -24,8 +24,8 @@ export default function App() {
     setActiveBottom(index);
     if (index === 0) setActiveView("home");
     if (index === 1) {
-      setActiveView("profile");
-      setActiveTab(2);
+      setActiveView("explore");
+      setActiveTab(0);
     }
     if (index === 2) setActiveView("news");
     if (index === 3) setActiveView("leagues");
@@ -34,7 +34,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#0b0f24] text-white">
-      <div className="relative max-w-md mx-auto min-h-screen flex flex-col overflow-hidden">
+      <div className="relative max-w-md md:max-w-2xl lg:max-w-3xl mx-auto min-h-screen flex flex-col overflow-hidden">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-[#1520A6]/40 blur-3xl" />
           <div className="absolute top-24 -right-28 h-80 w-80 rounded-full bg-white/10 blur-3xl" />

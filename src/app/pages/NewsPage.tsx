@@ -1,12 +1,14 @@
 export function NewsPage() {
   return (
     <section className="pb-6">
-      <div className="rounded-3xl bg-[#111730] p-5 shadow-lg">
-        <p className="text-xs uppercase tracking-[0.2em] text-white/60">
+      <div className="rounded-3xl bg-[#111730] p-5 md:p-6 shadow-lg">
+        <p className="text-xs uppercase tracking-[0.25em] text-white/60">
           News feed
         </p>
-        <h2 className="mt-2 text-xl font-semibold">Latest Headlines</h2>
-        <p className="mt-2 text-sm text-white/70">
+        <h2 className="mt-2 text-2xl font-semibold leading-tight">
+          Latest Headlines
+        </h2>
+        <p className="mt-2 text-sm text-white/70 leading-relaxed">
           Real-time updates from leagues and clubs.
         </p>
       </div>

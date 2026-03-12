@@ -19,17 +19,17 @@ type ProfilePageProps = {
 export function ProfilePage({ playerName = "Kylian Mbappe" }: ProfilePageProps) {
   return (
     <section className="pb-6">
-      <div className="rounded-3xl bg-[#111730] p-5 shadow-lg">
+      <div className="rounded-3xl bg-[#111730] p-5 md:p-6 shadow-lg">
         <div className="flex items-center gap-4">
           <div className="h-16 w-16 rounded-2xl bg-white/10" />
           <div>
-            <p className="text-lg font-semibold">{playerName}</p>
+            <p className="text-xl font-semibold leading-tight">{playerName}</p>
             <p className="text-xs text-white/60">
               Real Madrid · FW · France
             </p>
           </div>
         </div>
-        <div className="mt-5 grid grid-cols-2 gap-3">
+        <div className="mt-5 grid grid-cols-2 md:grid-cols-4 gap-3">
           {keyStats.map((stat) => (
             <div
               key={stat.label}
@@ -39,7 +39,7 @@ export function ProfilePage({ playerName = "Kylian Mbappe" }: ProfilePageProps) 
                   : "bg-white/5"
               }`}
             >
-              <p className="text-xs uppercase tracking-[0.2em] text-white/60">
+              <p className="text-xs uppercase tracking-[0.25em] text-white/60">
                 {stat.label}
               </p>
               <div className="mt-2 flex items-baseline justify-between">
@@ -51,17 +51,17 @@ export function ProfilePage({ playerName = "Kylian Mbappe" }: ProfilePageProps) 
         </div>
       </div>
 
-      <div className="mt-6 rounded-3xl bg-[#0f152d] p-5 shadow-lg">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-white/60">
+      <div className="mt-6 rounded-3xl bg-[#0f152d] p-5 md:p-6 shadow-lg">
+        <p className="text-sm font-semibold uppercase tracking-[0.25em] text-white/60">
           Advanced metrics
         </p>
-        <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
           {advancedStats.map((stat) => (
             <div
               key={stat.label}
               className="rounded-2xl bg-white/5 p-3"
             >
-              <p className="text-xs uppercase tracking-[0.2em] text-white/60">
+              <p className="text-xs uppercase tracking-[0.25em] text-white/60">
                 {stat.label}
               </p>
               <p className="text-base font-semibold">{stat.value}</p>
@@ -71,11 +71,11 @@ export function ProfilePage({ playerName = "Kylian Mbappe" }: ProfilePageProps) 
         </div>
       </div>
 
-      <div className="mt-6 rounded-3xl bg-gradient-to-br from-[#1520A6]/70 via-[#1b2a7a] to-[#0f152d] p-5">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-white/60">
+      <div className="mt-6 rounded-3xl bg-gradient-to-br from-[#1520A6]/70 via-[#1b2a7a] to-[#0f152d] p-5 md:p-6">
+        <p className="text-sm font-semibold uppercase tracking-[0.25em] text-white/60">
           Insight report
         </p>
-        <p className="mt-3 text-sm text-white/80">
+        <p className="mt-3 text-sm text-white/80 leading-relaxed">
           Mbappe is in elite form with strong shot volume and improved
           creativity. His xG trend suggests consistency, and his chance
           creation has ticked up compared to last season.
