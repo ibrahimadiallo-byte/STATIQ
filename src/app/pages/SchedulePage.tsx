@@ -8,12 +8,14 @@ const schedule = [
 export function SchedulePage() {
   return (
     <section className="pb-6">
-      <div className="rounded-3xl bg-[#111730] p-5 shadow-lg">
-        <p className="text-xs uppercase tracking-[0.2em] text-white/60">
+      <div className="rounded-3xl bg-[#111730] p-5 md:p-6 shadow-lg">
+        <p className="text-xs uppercase tracking-[0.25em] text-white/60">
           Schedule
         </p>
-        <h2 className="mt-2 text-xl font-semibold">Upcoming Fixtures</h2>
-        <p className="mt-2 text-sm text-white/70">
+        <h2 className="mt-2 text-2xl font-semibold leading-tight">
+          Upcoming Fixtures
+        </h2>
+        <p className="mt-2 text-sm text-white/70 leading-relaxed">
           Real-time fixture list and kickoff times.
         </p>
       </div>

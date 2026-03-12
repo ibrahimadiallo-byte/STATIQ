@@ -70,8 +70,8 @@ export function SearchPage({
 
   return (
     <section className="pb-6">
-      <div className="rounded-2xl bg-[#111730] p-4 shadow-lg">
-        <label className="text-xs uppercase tracking-[0.2em] text-white/60">
+      <div className="rounded-2xl bg-[#111730] p-4 md:p-5 shadow-lg">
+        <label className="text-xs uppercase tracking-[0.25em] text-white/60">
           Search players
         </label>
         <div className="mt-3 flex items-center gap-3 rounded-2xl bg-white/5 px-4 py-3">
@@ -93,7 +93,7 @@ export function SearchPage({
       </div>
 
       {isLoading && (
-        <div className="mt-4 space-y-3">
+      <div className="mt-4 space-y-3">
           {[...Array(3)].map((_, index) => (
             <div
               key={`loading-${index}`}
@@ -120,7 +120,7 @@ export function SearchPage({
           {filteredPlayers.map((player) => (
           <button
             key={player.name}
-            className="w-full rounded-2xl bg-[#0f152d] px-4 py-4 text-left shadow-lg transition hover:bg-[#1520A6]/20"
+            className="w-full rounded-2xl bg-[#0f152d] px-4 py-4 md:px-5 md:py-5 text-left shadow-lg transition hover:bg-[#1520A6]/20"
             onClick={() => onSelectPlayer(player.name)}
           >
             <div className="flex items-center gap-4">
