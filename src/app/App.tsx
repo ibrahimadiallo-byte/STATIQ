@@ -2,7 +2,7 @@ import { Header } from "./components/header";
 import { TabNavigation } from "./components/tab-navigation";
 import { BottomNavigation } from "./components/bottom-navigation";
 import { SearchPage } from "./pages/SearchPage";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ComparePage } from "./pages/ComparePage";
 import { HomePage } from "./pages/HomePage";
@@ -19,6 +19,10 @@ export default function App() {
   const [activeView, setActiveView] = useState<
     "home" | "explore" | "search" | "profile" | "compare" | "news" | "leagues" | "schedule"
   >("home");
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [activeView, activeTab]);
 
   const handleBottomSelect = (index: number) => {
     setActiveBottom(index);
