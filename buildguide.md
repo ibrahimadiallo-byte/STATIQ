@@ -65,13 +65,18 @@ npm install express @supabase/supabase-js dotenv axios cors openai
 
 Vercel Configuration:
 Create a vercel.json in the root to ensure Express works as a serverless function:
+```json
 {
   "version": 2,
-  "rewrites": [{ "source": "/(.*)", "destination": "/src/index.js" }]
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index.js" }]
 }
+```
+The serverless entrypoint is `api/index.js`, which exports the Express app from `server/app.js`.
 
 
-Environment Setup: Create .env locally. Important: Add .env to your .gitignore file before committing in GitHub Desktop.
+Environment Setup: Create `.env` locally. Important: Add `.env` to your `.gitignore` file before committing in GitHub Desktop.
+
+**Branches:** Use a separate branch per phase (`phase-1`, `phase-2`, etc.); merge to main after tests pass. See `docs/SOURCES.md` for API/source references and latest docs links.
 Sprint 2: The Ingestion Services
 Focus: Fetching data from RapidAPI and Understat (per PRD: aggregated key stats from multiple data sources).
 Player Search & Ingest:

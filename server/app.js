@@ -2,12 +2,23 @@ import express from 'express';
 import cors from 'cors';
 import { searchOrIngestPlayer } from './playerService.js';
 import { getUnifiedProfile } from './profileService.js';
+import { ensureProfileFresh } from './refreshService.js';
 import { getOrCreateInsight, generateComparisonNarrative } from './aiService.js';
 import { supabase } from './supabase.js';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+/** Map thrown errors to HTTP status and JSON response (Phase 2: clear 503/502/404). */
+function sendError(res, err, defaultMessage = 'Request failed') {
+  const msg = err?.message || defaultMessage;
+  if (/required env|Missing required|OPENAI_API_KEY is required|RAPIDAPI_KEY is required/.test(msg))
+    return res.status(503).json({ error: msg });
+  if (/not found|Player not found|No player found/.test(msg))
+    return res.status(404).json({ error: msg });
+  return res.status(502).json({ error: msg });
+}
 
 /** Health check */
 app.get('/api/health', (_, res) => {
@@ -25,6 +36,7 @@ app.get('/api/players/search', async (req, res) => {
       return res.status(400).json({ error: 'Query parameter "q" is required' });
     }
     const { player, source } = await searchOrIngestPlayer(q);
+    await ensureProfileFresh(player.id, await getUnifiedProfile(player.id));
     const profile = await getUnifiedProfile(player.id);
     const insight = await getOrCreateInsight(player.id, true);
     return res.json({
@@ -34,7 +46,7 @@ app.get('/api/players/search', async (req, res) => {
       insight: insight ? { summary_text: insight.summary_text } : null,
     });
   } catch (err) {
-    return res.status(500).json({ error: err.message || 'Search failed' });
+    return sendError(res, err, 'Search failed');
   }
 });
 
@@ -44,8 +56,10 @@ app.get('/api/players/search', async (req, res) => {
  */
 app.get('/api/players/:id', async (req, res) => {
   try {
-    const profile = await getUnifiedProfile(req.params.id);
+    let profile = await getUnifiedProfile(req.params.id);
     if (!profile) return res.status(404).json({ error: 'Player not found' });
+    await ensureProfileFresh(req.params.id, profile);
+    profile = await getUnifiedProfile(req.params.id);
     const insight = await getOrCreateInsight(req.params.id, true);
     const summary = insight?.summary_text ?? profile.insight?.summary_text ?? null;
     return res.json({
@@ -54,7 +68,7 @@ app.get('/api/players/:id', async (req, res) => {
       insight: summary != null ? { summary_text: summary } : null,
     });
   } catch (err) {
-    return res.status(500).json({ error: err.message || 'Failed to load profile' });
+    return sendError(res, err, 'Failed to load profile');
   }
 });
 
@@ -103,7 +117,7 @@ app.get('/api/compare', async (req, res) => {
       narrative,
     });
   } catch (err) {
-    return res.status(500).json({ error: err.message || 'Comparison failed' });
+    return sendError(res, err, 'Comparison failed');
   }
 });
 
@@ -135,7 +149,7 @@ app.patch('/api/players/:id', async (req, res) => {
     if (!data) return res.status(404).json({ error: 'Player not found' });
     return res.json(data);
   } catch (err) {
-    return res.status(500).json({ error: err.message || 'Update failed' });
+    return sendError(res, err, 'Update failed');
   }
 });
 
