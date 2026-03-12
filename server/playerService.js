@@ -136,6 +136,13 @@ export async function searchCandidates(searchTerm) {
       const firstName = trimmed.split(/\s+/)[0];
       if (firstName.length >= 3) apiList = await fetchProfilesFromApi(key, firstName);
     }
+    // Fallback: common first-name → surname so "cristiano" finds Cristiano Ronaldo
+    if (apiList.length === 0 && !trimmed.includes(' ')) {
+      const lower = trimmed.toLowerCase();
+      const fallbacks = { cristiano: 'Ronaldo', kylian: 'Mbappe', erling: 'Haaland', mohamed: 'Salah', lionel: 'Messi' };
+      const fallback = fallbacks[lower];
+      if (fallback) apiList = await fetchProfilesFromApi(key, fallback);
+    }
   }
   const seenRapidIds = new Set(fromDb.map((p) => p.rapid_api_id).filter(Boolean));
 

@@ -70,6 +70,19 @@ Once all are ready, add the same env vars in Vercel and deploy.
 
 After deploy, your API is available at `https://<your-project>.vercel.app/api/...`.
 
+### Search returns no players on Vercel?
+
+1. **Environment variables** — In Vercel → your project → **Settings → Environment Variables**, add (same as `.env`):
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `RAPIDAPI_KEY`
+   - `OPENAI_API_KEY`
+   Redeploy after adding or changing variables (Deployments → … → Redeploy).
+
+2. **Try by surname** — The API often matches by surname. Try **"Ronaldo"** (Cristiano), **"Mbappe"**, **"Salah"**, **"Messi"**. The backend also tries a fallback for "cristiano" → "Ronaldo" etc.
+
+3. **Check API** — `GET https://YOUR_APP.vercel.app/api/health` should return `{"ok":true}`. Then try `GET https://YOUR_APP.vercel.app/api/players/search?q=Ronaldo`; if you get 503, env vars are missing or invalid.
+
 ## Backend Phase 2: Deploy readiness
 
 When you deploy (see “Deploy to Vercel” above), run the smoke test:
