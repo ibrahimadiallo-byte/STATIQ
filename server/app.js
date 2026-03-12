@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { searchOrIngestPlayer } from './playerService.js';
 import { getUnifiedProfile } from './profileService.js';
+import { ensureProfileFresh } from './refreshService.js';
 import { getOrCreateInsight, generateComparisonNarrative } from './aiService.js';
 import { supabase } from './supabase.js';
 
@@ -25,6 +26,7 @@ app.get('/api/players/search', async (req, res) => {
       return res.status(400).json({ error: 'Query parameter "q" is required' });
     }
     const { player, source } = await searchOrIngestPlayer(q);
+    await ensureProfileFresh(player.id, await getUnifiedProfile(player.id));
     const profile = await getUnifiedProfile(player.id);
     const insight = await getOrCreateInsight(player.id, true);
     return res.json({
@@ -44,8 +46,10 @@ app.get('/api/players/search', async (req, res) => {
  */
 app.get('/api/players/:id', async (req, res) => {
   try {
-    const profile = await getUnifiedProfile(req.params.id);
+    let profile = await getUnifiedProfile(req.params.id);
     if (!profile) return res.status(404).json({ error: 'Player not found' });
+    await ensureProfileFresh(req.params.id, profile);
+    profile = await getUnifiedProfile(req.params.id);
     const insight = await getOrCreateInsight(req.params.id, true);
     const summary = insight?.summary_text ?? profile.insight?.summary_text ?? null;
     return res.json({
