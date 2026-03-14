@@ -5,8 +5,8 @@
 import axios from 'axios';
 import { get, set, TTL } from './cache.js';
 
-const RAPIDAPI_BASE = 'https://api-football-v1.p.rapidapi.com/v3';
-const RAPIDAPI_HOST = 'api-football-v1.p.rapidapi.com';
+const RAPIDAPI_HOST = process.env.RAPIDAPI_HOST || 'api-football-v1.p.rapidapi.com';
+const RAPIDAPI_BASE = `https://${RAPIDAPI_HOST}/v3`;
 
 function getKey() {
   const key = process.env.RAPIDAPI_KEY;
@@ -23,8 +23,8 @@ async function request(path, params = {}, cacheKey = null, ttlMs = null) {
   const { data, status } = await axios.get(`${RAPIDAPI_BASE}${path}`, {
     params,
     headers: {
-      'X-RapidAPI-Key': key,
-      'X-RapidAPI-Host': RAPIDAPI_HOST,
+      'x-rapidapi-key': key,
+      'x-rapidapi-host': RAPIDAPI_HOST,
     },
     validateStatus: (s) => s < 500,
   });
@@ -141,5 +141,18 @@ export async function getWorldCupTeams(leagueId = WORLD_CUP_LEAGUE_ID, season = 
     { league: leagueId, season },
     `worldcup:teams:${leagueId}:${season}`,
     TTL.TEAM_MS
+  );
+}
+
+/**
+ * Fixture events (goals, cards, VAR decisions) for a single fixture. Used for Momentum Spike logic.
+ * GET /fixtures/events?fixture=
+ */
+export async function getFixtureEvents(fixtureId) {
+  return request(
+    '/fixtures/events',
+    { fixture: fixtureId },
+    `fixtures:events:${fixtureId}`,
+    TTL.FIXTURES_TODAY_MS
   );
 }

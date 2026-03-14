@@ -6,7 +6,10 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "server": "node server/run.js"
+    "server": "node server/run.js",
+    "kill-port": "lsof -ti:3000 | xargs kill -9 2>/dev/null || true",
+    "dev:all": "npm run kill-port && concurrently -n api,web -c blue,green \"node server/run.js\" \"npm run dev\" --kill-others=false",
+    "test:prd": "node tests/prd-mvp-test.js"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
@@ -71,6 +74,7 @@
     "vaul": "1.1.2"
   },
   "devDependencies": {
+    "concurrently": "^9.1.2",
     "@tailwindcss/vite": "4.1.12",
     "@vitejs/plugin-react": "4.7.0",
     "tailwindcss": "4.1.12",

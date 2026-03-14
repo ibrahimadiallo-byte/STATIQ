@@ -70,7 +70,10 @@ Team-level analytics (focused on players for MVP)
 
 
 6. Datasets & Data Sources
-One of the strongest advantages of building in the sports industry is the availability of clean, well-structured public data. The following sources will be used to power STATIQ:
+
+**MVP build scope (current release):** For the initial MVP we use **RapidAPI** (player identity, base stats, league standings, World Cup fixtures/standings/teams) and **Understat** (xG, xA, advanced metrics) where available, plus optional **external_stats** for any additional sources we ingest. FBref and Transfermarkt are deferred to a later phase; the schema and ingestion pattern support adding them without breaking the product.
+
+One of the strongest advantages of building in the sports industry is the availability of clean, well-structured public data. The following sources will be used to power STATIQ (full product vision):
 
 Data Source
 What It Provides

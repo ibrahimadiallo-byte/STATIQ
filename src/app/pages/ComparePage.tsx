@@ -7,6 +7,7 @@ import {
   type Player,
   type SearchResponse,
 } from "@/app/lib/api";
+import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 
 type ComparePageProps = {
   preselectedPlayerId?: string | null;
@@ -136,15 +137,11 @@ export function ComparePage({ preselectedPlayerId }: ComparePageProps) {
         </p>
         {player1Id && (compareData?.player1 ?? player1Info) ? (
           <div className="flex items-center gap-3">
-            {(compareData?.player1 ?? player1Info)?.photo_url ? (
-              <img
-                src={(compareData?.player1 ?? player1Info)!.photo_url!}
-                alt=""
-                className="h-12 w-12 rounded-2xl object-cover bg-white/10"
-              />
-            ) : (
-              <div className="h-12 w-12 rounded-2xl bg-white/10" />
-            )}
+            <PlayerAvatar
+              src={(compareData?.player1 ?? player1Info)?.photo_url}
+              name={(compareData?.player1 ?? player1Info)?.name}
+              className="h-12 w-12 rounded-2xl bg-white/10"
+            />
             <div>
               <p className="text-sm font-semibold">{(compareData?.player1 ?? player1Info)!.name}</p>
               <p className="text-xs text-white/60">{(compareData?.player1 ?? player1Info)!.team_name ?? "—"}</p>
@@ -182,11 +179,11 @@ export function ComparePage({ preselectedPlayerId }: ComparePageProps) {
                       setSearch1Open(false);
                     }}
                   >
-                    {p.photo_url ? (
-                      <img src={p.photo_url} alt="" className="h-8 w-8 rounded-lg object-cover" />
-                    ) : (
-                      <div className="h-8 w-8 rounded-lg bg-white/10" />
-                    )}
+                    <PlayerAvatar
+                      src={p.photo_url}
+                      name={p.name}
+                      className="h-8 w-8 rounded-lg bg-white/10"
+                    />
                     <span>{p.name}</span>
                     <span className="text-white/50 text-xs">{p.team_name ?? ""}</span>
                   </button>
@@ -203,15 +200,11 @@ export function ComparePage({ preselectedPlayerId }: ComparePageProps) {
         </p>
         {player2Id && (compareData?.player2 ?? player2Info) ? (
           <div className="flex items-center gap-3">
-            {(compareData?.player2 ?? player2Info)?.photo_url ? (
-              <img
-                src={(compareData?.player2 ?? player2Info)!.photo_url!}
-                alt=""
-                className="h-12 w-12 rounded-2xl object-cover bg-white/10"
-              />
-            ) : (
-              <div className="h-12 w-12 rounded-2xl bg-white/10" />
-            )}
+            <PlayerAvatar
+              src={(compareData?.player2 ?? player2Info)?.photo_url}
+              name={(compareData?.player2 ?? player2Info)?.name}
+              className="h-12 w-12 rounded-2xl bg-white/10"
+            />
             <div>
               <p className="text-sm font-semibold">{(compareData?.player2 ?? player2Info)!.name}</p>
               <p className="text-xs text-white/60">{(compareData?.player2 ?? player2Info)!.team_name ?? "—"}</p>
@@ -249,11 +242,11 @@ export function ComparePage({ preselectedPlayerId }: ComparePageProps) {
                       setSearch2Open(false);
                     }}
                   >
-                    {p.photo_url ? (
-                      <img src={p.photo_url} alt="" className="h-8 w-8 rounded-lg object-cover" />
-                    ) : (
-                      <div className="h-8 w-8 rounded-lg bg-white/10" />
-                    )}
+                    <PlayerAvatar
+                      src={p.photo_url}
+                      name={p.name}
+                      className="h-8 w-8 rounded-lg bg-white/10"
+                    />
                     <span>{p.name}</span>
                     <span className="text-white/50 text-xs">{p.team_name ?? ""}</span>
                   </button>
@@ -277,7 +270,10 @@ export function ComparePage({ preselectedPlayerId }: ComparePageProps) {
 
       {compareError && (
         <div className="mt-6 rounded-3xl bg-[#2b1630] p-5 md:p-6 text-sm text-white/80">
-          {compareError}
+          <p>{compareError}</p>
+          <p className="mt-2 text-white/60 text-xs">
+            Try again or pick different players.
+          </p>
         </div>
       )}
 
@@ -286,15 +282,11 @@ export function ComparePage({ preselectedPlayerId }: ComparePageProps) {
           <div className="mt-6 rounded-3xl bg-[#111730] p-5 md:p-6 shadow-lg">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                {compareData.player1.photo_url ? (
-                  <img
-                    src={compareData.player1.photo_url}
-                    alt=""
-                    className="h-12 w-12 rounded-2xl object-cover bg-white/10"
-                  />
-                ) : (
-                  <div className="h-12 w-12 rounded-2xl bg-white/10" />
-                )}
+                <PlayerAvatar
+                  src={compareData.player1.photo_url}
+                  name={compareData.player1.name}
+                  className="h-12 w-12 rounded-2xl bg-white/10"
+                />
                 <div>
                   <p className="text-sm font-semibold">{compareData.player1.name}</p>
                   <p className="text-xs text-white/60">{compareData.player1.team_name ?? "—"}</p>
@@ -302,15 +294,11 @@ export function ComparePage({ preselectedPlayerId }: ComparePageProps) {
               </div>
               <span className="text-xs uppercase tracking-[0.2em] text-white/50">vs</span>
               <div className="flex items-center gap-3">
-                {compareData.player2.photo_url ? (
-                  <img
-                    src={compareData.player2.photo_url}
-                    alt=""
-                    className="h-12 w-12 rounded-2xl object-cover bg-white/10"
-                  />
-                ) : (
-                  <div className="h-12 w-12 rounded-2xl bg-white/10" />
-                )}
+                <PlayerAvatar
+                  src={compareData.player2.photo_url}
+                  name={compareData.player2.name}
+                  className="h-12 w-12 rounded-2xl bg-white/10"
+                />
                 <div>
                   <p className="text-sm font-semibold">{compareData.player2.name}</p>
                   <p className="text-xs text-white/60">{compareData.player2.team_name ?? "—"}</p>

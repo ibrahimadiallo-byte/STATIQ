@@ -1,19 +1,23 @@
-import { supabase } from './supabase.js';
-import axios from 'axios';
-
-const RAPIDAPI_BASE = 'https://api-football-v1.p.rapidapi.com/v3';
-const RAPIDAPI_HOST = 'api-football-v1.p.rapidapi.com';
-
-function getRapidKey() {
-  const key = process.env.RAPIDAPI_KEY;
-  if (!key) throw new Error('RAPIDAPI_KEY is required for ingest');
-  return key;
-}
-
 /**
- * Normalize one API-Football profile item to our player row shape.
+ * STATIQ Multi-Source Aggregator (PRD: AI Narrative Workflow).
+ *
+ * Primary: BSD Sports API (free, unlimited) for 8,900+ players.
+ * Fallback: api-sports.io (Direct) via API_SPORTS_KEY — profile, search, lineup.
+ * Advanced Metrics: Understat (xG, xA, shot maps) via understatService / external_stats.
+ * Market Value: Supabase/Transfermarkt dataset via marketValueService.
+ *
+ * Aggregates all sources into getAggregatedPlayerData() for generatePlayerReport (AI narrative).
  */
-function normalizeApiPlayer(item, searchTerm) {
+
+import { supabase } from './supabase.js';
+import * as apiSports from './apiSportsService.js';
+import * as bsd from './bsdService.js';
+import { fetchUnderstatPlayerStats } from './understatService.js';
+import { getExternalStatsForPlayer } from './externalStatsService.js';
+import { getMarketValueForPlayer } from './marketValueService.js';
+
+/** Normalize API-Sports player item to our DB row shape (player + statistics). */
+function normalizeApiSportsPlayer(item, searchTerm) {
   const p = item.player || item;
   const stats = item.statistics?.[0];
   const teamName = stats?.team?.name ?? null;
@@ -31,9 +35,6 @@ function normalizeApiPlayer(item, searchTerm) {
   };
 }
 
-/**
- * Ensure player exists in DB by rapid_api_id; return our player row (insert or select).
- */
 async function upsertPlayer(row) {
   if (row.rapid_api_id == null) {
     const { data: inserted, error } = await supabase
@@ -59,9 +60,6 @@ async function upsertPlayer(row) {
   return inserted;
 }
 
-/**
- * Get player by our UUID (for profile).
- */
 export async function getPlayerById(id) {
   const { data, error } = await supabase
     .from('players')
@@ -72,10 +70,6 @@ export async function getPlayerById(id) {
   return data;
 }
 
-/**
- * Stable ID: exact lookup by rapid_api_id.
- * @returns {Promise<object | null>} Our player row or null
- */
 export async function getPlayerByRapidId(rapidId) {
   const id = parseInt(rapidId, 10);
   if (Number.isNaN(id)) return null;
@@ -88,137 +82,132 @@ export async function getPlayerByRapidId(rapidId) {
   return data;
 }
 
-/** Current season for league-based search fallback. */
-const CURRENT_SEASON = new Date().getFullYear();
+/**
+ * Multi-source aggregated data for one player (for AI narrative).
+ * Core: api-sports.io profile + optional lineup.
+ * Advanced: Understat xG/xA (and external_stats).
+ * Market: Transfermarkt value + brand equity from Supabase.
+ *
+ * @param {string} playerId - Our player UUID
+ * @returns {Promise<{ player: object, coreData: object|null, understatData: object|null, marketData: object|null }>}
+ */
+export async function getAggregatedPlayerData(playerId) {
+  const player = await getPlayerById(playerId);
+  if (!player) return null;
 
-/** Major leagues to try when profiles search returns nothing (API-Football league ids). */
-const FALLBACK_LEAGUES = [
-  39,  // Premier League
-  140, // La Liga
-  135, // Serie A
-  78,  // Bundesliga
-  61,  // Ligue 1
-];
-
-async function fetchProfilesFromApi(apiKey, search) {
-  const { data, status } = await axios.get(
-    `${RAPIDAPI_BASE}/players/profiles`,
-    {
-      params: { search },
-      headers: {
-        'X-RapidAPI-Key': apiKey,
-        'X-RapidAPI-Host': RAPIDAPI_HOST,
-      },
-      validateStatus: (s) => s < 500,
+  let coreData = null;
+  if (player.rapid_api_id) {
+    try {
+      coreData = await apiSports.getPlayerProfile(player.rapid_api_id);
+    } catch {
+      coreData = null;
     }
-  );
-  return status === 200 && data?.response?.length ? data.response : [];
+  }
+
+  let understatData = null;
+  if (player.understat_id) {
+    try {
+      const stats = await fetchUnderstatPlayerStats(player.understat_id);
+      understatData = Array.isArray(stats) ? { seasons: stats } : { seasons: [] };
+    } catch {
+      understatData = null;
+    }
+  }
+  const externalStats = await getExternalStatsForPlayer(playerId);
+  if (externalStats?.length) {
+    understatData = understatData || {};
+    understatData.externalStats = externalStats;
+  }
+
+  let marketData = null;
+  try {
+    marketData = await getMarketValueForPlayer(playerId);
+  } catch {
+    marketData = null;
+  }
+
+  return {
+    player,
+    coreData,
+    understatData,
+    marketData,
+  };
 }
 
 /**
- * Fallback: search players by league + season (more reliable when profiles search is empty).
- * GET /v3/players?league=&season=&search=
+ * Normalize string (remove accents for comparison).
  */
-async function fetchPlayersByLeague(apiKey, search, leagueId, season) {
-  const { data, status } = await axios.get(
-    `${RAPIDAPI_BASE}/players`,
-    {
-      params: { league: leagueId, season, search },
-      headers: {
-        'X-RapidAPI-Key': apiKey,
-        'X-RapidAPI-Host': RAPIDAPI_HOST,
-      },
-      validateStatus: (s) => s < 500,
-      timeout: 10000,
-    }
-  );
-  return status === 200 && data?.response?.length ? data.response : [];
+function removeAccents(str) {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
+/**
+ * Search: Database-only with accent-insensitive matching.
+ * Fast search since all 13,000+ players are already imported.
+ * @returns {Promise<{ candidates: object[], source: string }>}
+ */
 export async function searchCandidates(searchTerm) {
   const trimmed = String(searchTerm).trim();
-  if (!trimmed) return { candidates: [] };
+  if (!trimmed) return { candidates: [], source: 'none' };
 
-  const key = getRapidKey();
-
-  // 1. DB: any existing by name (optional cache — app works with empty DB; API is primary)
-  const { data: byName, error: selectError } = await supabase
+  const normalizedTerm = removeAccents(trimmed);
+  
+  // Use first 3 chars for broad DB query, then filter locally for accent matching
+  const prefix = trimmed.slice(0, Math.min(3, trimmed.length));
+  
+  const { data: dbResults } = await supabase
     .from('players')
     .select('*')
-    .ilike('name', `%${trimmed}%`)
-    .limit(20);
+    .ilike('name', `%${prefix}%`)
+    .limit(500);
 
-  if (selectError) throw new Error(`Supabase lookup failed: ${selectError.message}`);
-  const fromDb = byName || [];
+  // Filter for accent-insensitive match
+  const fromDb = (dbResults || []).filter((p) => {
+    const normalizedName = removeAccents(p.name || '');
+    return normalizedName.includes(normalizedTerm);
+  });
 
-  // 2. API-first: call external API for 2+ chars so search works even when DB has no players
-  let apiList = [];
-  if (trimmed.length >= 2) {
-    apiList = await fetchProfilesFromApi(key, trimmed);
-    if (apiList.length === 0 && trimmed.includes(' ')) {
-      const surname = trimmed.split(/\s+/).pop();
-      if (surname.length >= 2) apiList = await fetchProfilesFromApi(key, surname);
-    }
-    if (apiList.length === 0 && trimmed.includes(' ')) {
-      const firstName = trimmed.split(/\s+/)[0];
-      if (firstName.length >= 2) apiList = await fetchProfilesFromApi(key, firstName);
-    }
-    // Fallback: optional first-name → surname map for a few common first names (e.g. cristiano→Ronaldo)
-    if (apiList.length === 0 && !trimmed.includes(' ')) {
-      const lower = trimmed.toLowerCase();
-      const fallbacks = { cristiano: 'Ronaldo', kylian: 'Mbappe', erling: 'Haaland', mohamed: 'Salah', lionel: 'Messi' };
-      const fallback = fallbacks[lower];
-      if (fallback) apiList = await fetchProfilesFromApi(key, fallback);
-    }
-    // Fallback: search by league + season (profiles often empty for full names; /players with league returns more)
-    if (apiList.length === 0) {
-      const searchTerms = trimmed.includes(' ')
-        ? [trimmed.split(/\s+/).pop(), trimmed.split(/\s+/)[0]]
-        : [trimmed];
-      const season = CURRENT_SEASON;
-      for (const term of searchTerms) {
-        if (term.length < 2) continue;
-        for (const leagueId of FALLBACK_LEAGUES) {
-          const byLeague = await fetchPlayersByLeague(key, term, leagueId, season);
-          if (byLeague.length) {
-            apiList = byLeague;
-            break;
-          }
-        }
-        if (apiList.length) break;
-      }
-    }
-  }
-  const seenRapidIds = new Set(fromDb.map((p) => p.rapid_api_id).filter(Boolean));
-
-  for (const item of apiList) {
-    const row = normalizeApiPlayer(item, trimmed);
-    if (row.rapid_api_id != null && seenRapidIds.has(row.rapid_api_id)) continue;
-    const player = await upsertPlayer(row);
-    if (player) {
-      fromDb.push(player);
-      if (player.rapid_api_id != null) seenRapidIds.add(player.rapid_api_id);
-    }
-  }
-
-  // Dedupe by id and sort by name
+  // Dedupe and sort
   const byId = new Map();
   for (const p of fromDb) byId.set(p.id, p);
-  const candidates = Array.from(byId.values()).sort((a, b) =>
-    (a.name || '').localeCompare(b.name || '')
-  );
+  const candidates = Array.from(byId.values())
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    .slice(0, 50);
 
-  return { candidates };
+  return { candidates, source: 'db' };
 }
 
-/**
- * Single-player search (legacy): first candidate or throw. Use searchCandidates for multi.
- * @returns {Promise<{ player: object, source: 'db' | 'api' }>}
- */
 export async function searchOrIngestPlayer(searchTerm) {
   const { candidates } = await searchCandidates(searchTerm);
-  if (!candidates.length) {
-    throw new Error('Player not found in API');
-  }
+  if (!candidates.length) throw new Error('Player not found');
   return { player: candidates[0], source: 'db' };
+}
+
+/** Debug: raw search shape from available APIs. */
+export async function fetchRawSearchShape(searchTerm) {
+  const bsdAvailable = bsd.isAvailable();
+  const apiSportsAvailable = !!process.env.API_SPORTS_KEY;
+  
+  let bsdCount = 0;
+  let apiSportsCount = 0;
+  
+  if (bsdAvailable) {
+    try {
+      const results = await bsd.searchPlayers(searchTerm);
+      bsdCount = results.length;
+    } catch { /* ignore */ }
+  }
+  
+  if (apiSportsAvailable) {
+    try {
+      const results = await apiSports.searchPlayers(searchTerm);
+      apiSportsCount = results.length;
+    } catch { /* ignore */ }
+  }
+
+  return {
+    bsd: { available: bsdAvailable, results: bsdCount },
+    apiSports: { available: apiSportsAvailable, results: apiSportsCount },
+    primarySource: bsdAvailable ? 'bsd' : (apiSportsAvailable ? 'api-sports' : 'db-only'),
+  };
 }

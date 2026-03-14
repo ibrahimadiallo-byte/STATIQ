@@ -1,13 +1,15 @@
-import { Shield, User } from "lucide-react";
+import { User } from "lucide-react";
 
 export function Header() {
   return (
     <header className="flex items-center justify-between px-4 py-4">
       {/* Logo */}
       <div className="flex items-center gap-2">
-        <div className="w-11 h-11 bg-[#1520A6] rounded-2xl flex items-center justify-center shadow-lg shadow-[#1520A6]/30">
-          <Shield className="w-6 h-6 text-white" />
-        </div>
+        <img 
+          src="/logo.png" 
+          alt="STATIQ" 
+          className="w-11 h-11 rounded-2xl object-cover shadow-lg shadow-[#1520A6]/30"
+        />
       </div>
 
       {/* Title */}

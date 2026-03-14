@@ -1,4 +1,4 @@
-import { LayoutGrid, BarChart3, FileText, Trophy, Calendar } from "lucide-react";
+import { LayoutGrid, BarChart3 } from "lucide-react";
 
 type BottomNavigationProps = {
   activeIndex: number;
@@ -9,9 +9,6 @@ export function BottomNavigation({ activeIndex, onSelect }: BottomNavigationProp
   const navItems = [
     { icon: LayoutGrid, label: "Home" },
     { icon: BarChart3, label: "Stats" },
-    { icon: FileText, label: "News" },
-    { icon: Trophy, label: "Leagues" },
-    { icon: Calendar, label: "Schedule" },
   ];
 
   return (

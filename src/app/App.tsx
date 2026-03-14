@@ -7,9 +7,6 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { ComparePage } from "./pages/ComparePage";
 import { HomePage } from "./pages/HomePage";
 import { ExplorePage } from "./pages/ExplorePage";
-import { NewsPage } from "./pages/NewsPage";
-import { LeaguesPage } from "./pages/LeaguesPage";
-import { SchedulePage } from "./pages/SchedulePage";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState(0);
@@ -17,7 +14,7 @@ export default function App() {
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [activeBottom, setActiveBottom] = useState(0);
   const [activeView, setActiveView] = useState<
-    "home" | "explore" | "search" | "profile" | "compare" | "news" | "leagues" | "schedule"
+    "home" | "explore" | "search" | "profile" | "compare"
   >("home");
 
   useEffect(() => {
@@ -31,9 +28,6 @@ export default function App() {
       setActiveView("explore");
       setActiveTab(0);
     }
-    if (index === 2) setActiveView("news");
-    if (index === 3) setActiveView("leagues");
-    if (index === 4) setActiveView("schedule");
   };
 
   return (
@@ -75,9 +69,6 @@ export default function App() {
           {activeView === "compare" && (
             <ComparePage preselectedPlayerId={selectedPlayerId} />
           )}
-          {activeView === "news" && <NewsPage />}
-          {activeView === "leagues" && <LeaguesPage />}
-          {activeView === "schedule" && <SchedulePage />}
         </main>
 
         <BottomNavigation activeIndex={activeBottom} onSelect={handleBottomSelect} />

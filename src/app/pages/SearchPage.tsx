@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { searchPlayers, type SearchResponse, type Player } from "@/app/lib/api";
+import { PlayerAvatar } from "@/app/components/PlayerAvatar";
 
 type SearchPageProps = {
   query: string;
@@ -29,7 +30,7 @@ export function SearchPage({
   const inputRef = useRef<HTMLInputElement>(null);
   const debouncedQuery = useDebounce(query.trim(), 280);
 
-  const runSearch = useCallback(async () => {
+  const runSearch = useCallback(async (signal: AbortSignal) => {
     if (!debouncedQuery) {
       setResults([]);
       setErrorMessage(null);
@@ -38,20 +39,24 @@ export function SearchPage({
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const data: SearchResponse = await searchPlayers(debouncedQuery);
-      setResults(data.candidates ?? []);
+      const data: SearchResponse = await searchPlayers(debouncedQuery, { signal });
+      if (!signal.aborted) setResults(data.candidates ?? []);
     } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : String(err) || "Something went wrong. Please try again.";
-      setErrorMessage(msg);
-      setResults([]);
+      if (!signal.aborted) {
+        const msg =
+          err instanceof Error ? err.message : String(err) || "Something went wrong. Please try again.";
+        setErrorMessage(msg);
+        setResults([]);
+      }
     } finally {
-      setIsLoading(false);
+      if (!signal.aborted) setIsLoading(false);
     }
   }, [debouncedQuery]);
 
   useEffect(() => {
-    runSearch();
+    const controller = new AbortController();
+    runSearch(controller.signal);
+    return () => controller.abort();
   }, [runSearch]);
 
   useEffect(() => {
@@ -132,15 +137,11 @@ export function SearchPage({
                         className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/10 transition"
                         onClick={() => handleSelect(player)}
                       >
-                        {player.photo_url ? (
-                          <img
-                            src={player.photo_url}
-                            alt=""
-                            className="h-10 w-10 rounded-xl object-cover bg-white/10"
-                          />
-                        ) : (
-                          <div className="h-10 w-10 rounded-xl bg-white/10" />
-                        )}
+                        <PlayerAvatar
+                          src={player.photo_url}
+                          name={player.name}
+                          className="h-10 w-10 rounded-xl bg-white/10"
+                        />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold truncate">{player.name}</p>
                           <p className="text-xs text-white/60 truncate">
@@ -204,15 +205,11 @@ export function SearchPage({
               onClick={() => handleSelect(player)}
             >
               <div className="flex items-center gap-4">
-                {player.photo_url ? (
-                  <img
-                    src={player.photo_url}
-                    alt=""
-                    className="h-12 w-12 rounded-2xl object-cover bg-white/10"
-                  />
-                ) : (
-                  <div className="h-12 w-12 rounded-2xl bg-white/10" />
-                )}
+                <PlayerAvatar
+                  src={player.photo_url}
+                  name={player.name}
+                  className="h-12 w-12 rounded-2xl bg-white/10"
+                />
                 <div className="flex-1">
                   <p className="text-sm font-semibold">{player.name}</p>
                   <p className="text-xs text-white/60">
