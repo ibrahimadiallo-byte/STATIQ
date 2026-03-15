@@ -3,7 +3,7 @@ import cors from 'cors';
 import { searchCandidates, getPlayerByRapidId, fetchRawSearchShape } from './playerService.js';
 import { getUnifiedProfile } from './profileService.js';
 import { ensureProfileFresh } from './refreshService.js';
-import { getOrCreateInsight, generateComparisonNarrative } from './aiService.js';
+import { getOrCreateInsight, generateComparisonNarrative, deleteCachedInsight } from './aiService.js';
 import {
   getLiveFixtures,
   getFixturesToday,
@@ -25,7 +25,7 @@ import {
   getCountdown as getWC2026Countdown,
   isPlayerInWorldCup,
 } from './worldCup2026Data.js';
-import { getPlayerPhoto as getSportsDbPhoto } from './sportsDbService.js';
+import { getPlayerPhoto as getSportsDbPhoto, getPlayerPhotos as getSportsDbPlayerPhotos } from './sportsDbService.js';
 import {
   getPremierLeagueMatches,
   getLeagueMatches,
@@ -117,10 +117,20 @@ app.get('/api/players/search', async (req, res) => {
     }
   }
   try {
-    const { candidates } = await searchCandidates(q);
-    // Fix photo URLs for all candidates
+    let { candidates } = await searchCandidates(q);
+    const needPhoto = candidates.filter((p) => !(p.photo_url && String(p.photo_url).trim()));
+    if (needPhoto.length > 0) {
+      const names = needPhoto.map((p) => p.name).filter(Boolean);
+      const photoMap = await getSportsDbPlayerPhotos(names);
+      candidates = candidates.map((p) => {
+        if (!(p.photo_url && String(p.photo_url).trim()) && p.name && photoMap.get(p.name))
+          return { ...p, photo_url: photoMap.get(p.name) };
+        return p;
+      });
+    }
     out.candidates = candidates.map((p) => fixPhotoUrl(p));
     if (candidates.length === 0) {
+      out.suggestions = ['Mbappé', 'Haaland', 'Bellingham'];
       out.debug = {
         hint: 'API returned no players. Check API_SPORTS_KEY and API_SPORTS_URL in .env.',
         API_SPORTS_KEY_set: !!process.env.API_SPORTS_KEY,
@@ -132,6 +142,7 @@ app.get('/api/players/search', async (req, res) => {
     const msg = err?.message || '';
     out.searchError = msg;
     out.candidates = out.candidates || [];
+    out.suggestions = ['Mbappé', 'Haaland', 'Bellingham'];
     if (req.query.debug === '2') return res.json(out);
     if (msg.includes('Player not found') || msg.includes('not found in API')) {
       return res.json(out);
@@ -174,16 +185,37 @@ app.get('/api/players/rapid/:rapidId/stats', async (req, res) => {
   }
 });
 
-/** Generate UI Avatars URL - always works, fast */
+/** Generate UI Avatars URL - fallback when no real photo (initials). */
 function getAvatarUrl(name) {
   const displayName = name || 'Player';
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=1520A6&color=fff&size=128&bold=true`;
 }
 
-/** All players get UI Avatars for consistent photos */
+/** API-Sports CDN URL when we have rapid_api_id (often works without auth). */
+function getApiSportsPhotoUrl(rapidApiId) {
+  if (rapidApiId == null) return null;
+  const id = Number(rapidApiId);
+  return Number.isFinite(id) ? `https://media.api-sports.io/football/players/${id}.png` : null;
+}
+
+/** Custom photos for star players (local assets); avoids initials fallback. */
+function getCustomStarPhotoUrl(playerName) {
+  const n = (playerName && String(playerName).trim()).toLowerCase();
+  if (n === 'lionel messi') return '/messi.png';
+  if (n === 'cristiano ronaldo') return '/ronaldo.png';
+  if (n === 'jude bellingham' || n === 'bellingham') return '/bellingham.png';
+  return null;
+}
+
+/** Use real photo_url when present; custom star assets; else API-Sports; else initials avatar. */
 function fixPhotoUrl(player) {
   if (!player) return player;
-  return { ...player, photo_url: getAvatarUrl(player.name) };
+  const custom = getCustomStarPhotoUrl(player.name);
+  if (custom) return { ...player, photo_url: custom };
+  let photo_url = (player.photo_url && String(player.photo_url).trim()) ? player.photo_url : null;
+  if (!photo_url && player.rapid_api_id) photo_url = getApiSportsPhotoUrl(player.rapid_api_id);
+  if (!photo_url) photo_url = getAvatarUrl(player.name);
+  return { ...player, photo_url };
 }
 
 /**
@@ -196,7 +228,23 @@ app.get('/api/players/:id', async (req, res) => {
     if (!profile) return res.status(404).json({ error: 'Player not found' });
     await ensureProfileFresh(req.params.id, profile);
     profile = await getUnifiedProfile(req.params.id);
-    const insight = await getOrCreateInsight(req.params.id, true);
+    if (profile.player && !(profile.player.photo_url && String(profile.player.photo_url).trim()) && profile.player.name) {
+      try {
+        const fallbackPhoto = await getSportsDbPhoto(profile.player.name);
+        if (fallbackPhoto) profile = { ...profile, player: { ...profile.player, photo_url: fallbackPhoto } };
+      } catch (_) { /* ignore */ }
+    }
+    let insight = await getOrCreateInsight(req.params.id, true);
+    const s = profile.stats?.[0];
+    const hasStats = s && ((s.minutes_played ?? 0) > 0 || (s.goals ?? 0) > 0 || (s.assists ?? 0) > 0);
+    const summaryText = insight?.summary_text ?? '';
+    const insightSaysNoStats = /0 minutes|no minutes played|non-existent|no goal contributions/i.test(summaryText);
+    if (hasStats && insightSaysNoStats) {
+      try {
+        await deleteCachedInsight(req.params.id);
+        insight = await getOrCreateInsight(req.params.id, true);
+      } catch (_) { /* keep existing insight on error */ }
+    }
     const summary = insight?.summary_text ?? profile.insight?.summary_text ?? null;
     return res.json({
       player: fixPhotoUrl(profile.player),
@@ -240,19 +288,22 @@ app.get('/api/compare', async (req, res) => {
       minutes_played: (s1.minutes_played ?? 0) - (s2.minutes_played ?? 0),
     };
 
-    const narrative = await generateComparisonNarrative(
-      profile1.player,
-      profile2.player,
+    const narrativeResult = await generateComparisonNarrative(
+      { ...profile1.player, stats: profile1.stats },
+      { ...profile2.player, stats: profile2.stats },
       deltas
     );
 
     return res.json({
-      player1: profile1.player,
-      player2: profile2.player,
+      player1: fixPhotoUrl(profile1.player),
+      player2: fixPhotoUrl(profile2.player),
       stats1: profile1.stats,
       stats2: profile2.stats,
       deltas,
-      narrative,
+      narrative: narrativeResult.narrative,
+      verdict: narrativeResult.verdict,
+      sustainability: narrativeResult.sustainability,
+      analysis: narrativeResult.analysis,
     });
   } catch (err) {
     return sendError(res, err, 'Comparison failed');
@@ -477,6 +528,20 @@ app.post('/api/sync/player/:id/stats', async (req, res) => {
   }
 });
 
+/** Regenerate AI insight for a player (clears cache; next profile load will generate from current DB stats) */
+app.post('/api/players/:id/regenerate-insight', async (req, res) => {
+  try {
+    const id = req.params.id?.trim();
+    if (!id) return res.status(400).json({ error: 'Player ID required' });
+    const profile = await getUnifiedProfile(id);
+    if (!profile) return res.status(404).json({ error: 'Player not found' });
+    await deleteCachedInsight(id);
+    return res.json({ ok: true, message: 'Insight cache cleared; next profile load will regenerate.' });
+  } catch (err) {
+    return sendError(res, err, 'Failed to regenerate insight');
+  }
+});
+
 /** Seed demo stats for key players (for MVP demo when API limits reached) */
 app.post('/api/seed-demo-stats', async (req, res) => {
   const { supabase } = await import('./supabase.js');
@@ -614,6 +679,26 @@ app.post('/api/admin/clear-insights', async (req, res) => {
       .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
     if (error) throw error;
     return res.json({ message: 'All insights cleared', deleted: count });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/** HEART: Log AI insight thumbs up/down */
+app.post('/api/insight-feedback', async (req, res) => {
+  try {
+    const { playerId, helpful } = req.body;
+    if (!playerId || typeof helpful !== 'boolean') {
+      return res.status(400).json({ error: 'playerId and helpful (boolean) required' });
+    }
+    const { error } = await supabase
+      .from('insight_feedback')
+      .insert({ player_id: playerId, helpful });
+    if (error) {
+      console.warn('[insight-feedback]', error.message);
+      return res.status(200).json({ ok: true }); // still succeed so UI doesn't break
+    }
+    return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

@@ -2,6 +2,9 @@ STATIQ
 Product Requirements Document
 Capstone Project — Cycle 4  |  Demo Day: March 18, 2026
 
+**Contributing:** [CONTRIBUTING.md](./CONTRIBUTING.md) (PR checklist + [Masterstrategy.md](./Masterstrategy.md) alignment).
+
+---
 
 1. Industry & Context
 The sports industry is one of the most data-rich industries on the planet. Every match, every player, every season generates thousands of data points — goals, assists, passing accuracy, defensive actions, injury history, form ratings, you name it. And with the FIFA World Cup kicking off in June 2026, global interest in futbol is about to hit an all-time high. Billions of fans will be tuning in, looking up players, debating performances, and trying to understand what the numbers actually mean.

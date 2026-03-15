@@ -53,38 +53,35 @@ export async function generateAndCacheInsight(
         payload: row.payload,
       }))
     : null;
-  const payload = {
-    name: player?.name,
-    position: player?.position,
-    team: player?.team_name,
-    season: latest?.season,
-    goals: latest?.goals,
-    assists: latest?.assists,
-    xg: latest?.xg,
-    xa: latest?.xa,
-    minutes_played: latest?.minutes_played,
-    externalStats: externalSummary,
-  };
+  const goals = latest?.goals ?? 0;
+  const xg = Number(latest?.xg ?? 0);
+  const assists = latest?.assists ?? 0;
+  const xa = Number(latest?.xa ?? 0);
+  const minutes = latest?.minutes_played ?? 0;
+  const minsPerGoal = goals > 0 && minutes > 0 ? Math.round(minutes / goals) : null;
 
   const completionPromise = ai.chat.completions.create({
     model: AI_MODEL,
     messages: [
       {
         role: 'system',
-        content: `You are a football scout. Write a brief scouting report.`,
+        content: `You are an elite football analyst for STATIQ. Explain what a player's stats actually mean in plain language. Be specific, reference the numbers directly, write like a confident sports journalist.
+When the player is a midfielder or defender, lead with non-obvious contributions (e.g. ball recoveries, line-breaking passes, defensive actions) when you can—not just goals and assists.
+Where relevant, describe behavioral or tactical patterns, not only totals. Write so the insight is quotable and specific enough for a video script. Never generic.`,
       },
       {
         role: 'user',
-        content: `Analyze this player: ${JSON.stringify(payload)}
+        content: `Analyze ${player?.name}'s ${latest?.season || '2025-26'} season:
+Goals: ${goals}, xG: ${xg}, gap: ${goals - xg}
+Assists: ${assists}, xA: ${xa}
+Minutes: ${minutes}, mins/goal: ${minsPerGoal ?? 'n/a'}
+Position: ${player?.position ?? 'unknown'}
 
-Write EXACTLY this format:
-• [5-10 word summary of form]
-• [5-10 word key stat]
-• [5-10 word outlook]
-
-PARAGRAPH: [2-3 sentence detailed analysis]
-
-IMPORTANT: Each bullet must be SHORT (under 12 words). Be concise.`,
+Return ONLY JSON:
+{
+  "bullets": ["3 findings, max 8 words each, specific to these numbers. First bullet: lead with non-obvious contribution when relevant (midfield/defence)."],
+  "analysis": "2-3 sentences. Reference specific stats. Explain the xG gap. State whether form is sustainable. Never generic."
+}`,
       },
     ],
     max_tokens: 400,
@@ -100,45 +97,34 @@ IMPORTANT: Each bullet must be SHORT (under 12 words). Be concise.`,
   }
 
   const rawContent = completion?.choices?.[0]?.message?.content?.trim() || '';
-  
-  // Parse bullet points and paragraph
   let bullets = [];
   let full_text = '';
-  
-  // Extract bullets (look for • or - or numbered items)
-  const bulletMatches = rawContent.match(/[•\-\*]\s*([^\n•\-\*]+)/g) || [];
-  bullets = bulletMatches.slice(0, 3).map(b => b.replace(/^[•\-\*]\s*/, '').trim());
-  
-  // Extract paragraph (after "PARAGRAPH:" or take remaining text)
-  const paragraphMatch = rawContent.match(/PARAGRAPH:\s*(.+)/is);
-  if (paragraphMatch) {
-    full_text = paragraphMatch[1].trim();
-  } else {
-    // Fallback: extract sentences not in bullets
-    const sentences = rawContent.split(/(?<=[.!?])\s+/).filter(s => 
-      !bulletMatches.some(b => b.includes(s.substring(0, 20)))
-    );
-    full_text = sentences.slice(0, 3).join(' ').trim();
+
+  const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      bullets = Array.isArray(parsed.bullets) ? parsed.bullets.slice(0, 3) : [];
+      full_text = parsed.analysis || parsed.full_text || '';
+    } catch (_) {}
   }
-  
-  // If we still don't have 3 bullets, generate from sentences
+  if (bullets.length === 0) {
+    const bulletMatches = rawContent.match(/[•\-\*]\s*([^\n•\-\*]+)/g) || [];
+    bullets = bulletMatches.slice(0, 3).map(b => b.replace(/^[•\-\*]\s*/, '').trim());
+  }
+  if (!full_text) {
+    const paragraphMatch = rawContent.match(/(?:PARAGRAPH|analysis):\s*(.+)/is);
+    full_text = paragraphMatch ? paragraphMatch[1].trim() : rawContent.substring(0, 300);
+  }
   if (bullets.length < 3) {
     const sentences = rawContent.split(/(?<=[.!?])\s+/).filter(s => s.length > 15);
     while (bullets.length < 3 && sentences.length > 0) {
-      const sent = sentences.shift();
-      if (!bullets.includes(sent)) {
-        bullets.push(sent.replace(/^[•\-\*\d.]\s*/, '').trim());
-      }
+      const sent = sentences.shift().replace(/^[•\-\*\d.]\s*/, '').trim();
+      if (sent && !bullets.includes(sent)) bullets.push(sent);
     }
   }
-  
-  // Ensure we have content
-  if (bullets.length === 0) {
-    bullets = ['Statistics available in profile', 'Review full analysis below', 'Check external stats for details'];
-  }
-  if (!full_text) {
-    full_text = rawContent.substring(0, 300);
-  }
+  if (bullets.length === 0) bullets = ['Form in stats', 'See analysis below', 'Check xG/xA'];
+  if (!full_text) full_text = rawContent.substring(0, 300);
 
   // Store as JSON string for flexibility
   const summary_text = JSON.stringify({ bullets, full_text });
@@ -172,46 +158,39 @@ export async function generatePlayerReport(playerId, aggregated) {
   const understatSeasons = understatData?.seasons || understatData?.externalStats || [];
   const market = marketData || {};
 
-  const payload = {
-    name: player?.name,
-    position: player?.position,
-    team: player?.team_name,
-    core: {
-      goals: stats?.goals ?? games?.goals,
-      assists: stats?.assists ?? games?.assists,
-      minutes: games?.minutes,
-      position: games?.position,
-    },
-    advanced: {
-      xG_xA: Array.isArray(understatSeasons) ? understatSeasons.slice(0, 3) : understatSeasons,
-      externalStats: understatData?.externalStats?.slice(0, 3) || [],
-    },
-    market: {
-      value_eur: market.value_eur,
-      value_history: market.value_history,
-      brand_equity: market.brand_equity,
-    },
-  };
+  function latestStat(arr, key) {
+    if (!Array.isArray(arr) || !arr.length) return 0;
+    const v = arr[0][key] ?? arr.find((s) => s[key] != null)?.[key];
+    return v != null ? Number(v) : 0;
+  }
+  const goals = stats?.goals ?? games?.goals ?? 0;
+  const assists = stats?.assists ?? games?.assists ?? 0;
+  const minutes = games?.minutes ?? 0;
+  const xg = understatSeasons?.[0]?.xG ?? latestStat(understatSeasons, 'xG') ?? 0;
+  const xa = understatSeasons?.[0]?.xA ?? latestStat(understatSeasons, 'xA') ?? 0;
+  const minsPerGoal = goals > 0 && minutes > 0 ? Math.round(minutes / goals) : null;
 
   const completionPromise = ai.chat.completions.create({
     model: AI_MODEL,
     messages: [
       {
         role: 'system',
-        content: `You are a clinical football scout. Write a brief scouting report.`,
+        content: `You are an elite football analyst for STATIQ. Explain what a player's stats actually mean in plain language. Be specific, reference the numbers directly.
+When the player is a midfielder or defender, lead with non-obvious contributions (e.g. ball recoveries, line-breaking passes) when you can. Where relevant, describe behavioral or tactical patterns. Write so the insight is quotable and specific enough for a video script. Never generic.`,
       },
       {
         role: 'user',
-        content: `Analyze this player: ${JSON.stringify(payload)}
+        content: `Analyze ${player?.name}'s season:
+Goals: ${goals}, xG: ${xg}, gap: ${goals - xg}
+Assists: ${assists}, xA: ${xa}
+Minutes: ${minutes}, mins/goal: ${minsPerGoal ?? 'n/a'}
+Position: ${player?.position ?? 'unknown'}
 
-Write EXACTLY this format:
-• [5-10 word summary of current form]
-• [5-10 word key stat highlight]
-• [5-10 word assessment]
-
-PARAGRAPH: [3-4 sentence detailed analysis]
-
-IMPORTANT: Each bullet must be SHORT (under 12 words). No long sentences in bullets.`,
+Return ONLY JSON:
+{
+  "bullets": ["3 findings, max 8 words each. First bullet: lead with non-obvious contribution when relevant."],
+  "analysis": "2-3 sentences. Reference specific stats. Explain the xG gap. State whether form is sustainable."
+}`,
       },
     ],
     max_tokens: 450,
@@ -271,8 +250,20 @@ IMPORTANT: Each bullet must be SHORT (under 12 words). No long sentences in bull
 }
 
 /**
- * Get latest insight for a player; optionally generate using full multi-source narrative.
- * When generateIfMissing is true, uses getAggregatedPlayerData + generatePlayerReport.
+ * Delete cached insight(s) for a player so the next getOrCreateInsight will regenerate from current DB stats.
+ */
+export async function deleteCachedInsight(playerId) {
+  const { error } = await supabase
+    .from('insight_reports')
+    .delete()
+    .eq('player_id', playerId);
+  if (error) throw new Error(`Failed to delete cached insight: ${error.message}`);
+}
+
+/**
+ * Get latest insight for a player; optionally generate.
+ * Uses getUnifiedProfile so insight is always based on DB stats (real or auto-generated),
+ * avoiding "0 minutes" for players who have no API-Sports/Understat data but do have profile stats.
  */
 export async function getOrCreateInsight(playerId, generateIfMissing = false) {
   const { data: rows } = await supabase
@@ -286,57 +277,61 @@ export async function getOrCreateInsight(playerId, generateIfMissing = false) {
 
   if (!generateIfMissing) return null;
 
-  try {
-    const { getAggregatedPlayerData } = await import('./playerService.js');
-    const aggregated = await getAggregatedPlayerData(playerId);
-    if (!aggregated) return null;
-    const { summary_text } = await generatePlayerReport(playerId, aggregated);
-    return { summary_text };
-  } catch (e) {
-    const { getUnifiedProfile } = await import('./profileService.js');
-    const profile = await getUnifiedProfile(playerId);
-    if (!profile) return null;
-    const { summary_text } = await generateAndCacheInsight(
-      playerId,
-      profile.player,
-      profile.stats,
-      profile.externalStats
-    );
-    return { summary_text };
-  }
+  const { getUnifiedProfile } = await import('./profileService.js');
+  const profile = await getUnifiedProfile(playerId);
+  if (!profile) return null;
+  const { summary_text } = await generateAndCacheInsight(
+    playerId,
+    profile.player,
+    profile.stats,
+    profile.externalStats
+  );
+  return { summary_text };
 }
 
 /**
- * Generate a short AI narrative for a player comparison (PRD: comparison with AI-generated context).
- * @param {object} player1 - { name, ... } and optionally stats
- * @param {object} player2 - { name, ... } and optionally stats
+ * Generate comparison narrative with verdict + sustainability (lucky vs due) for fantasy managers.
+ * @param {object} player1 - { name } and stats
+ * @param {object} player2 - { name } and stats
  * @param {object} deltas - e.g. { goals, assists, xg, xa }
- * @returns {Promise<string>}
+ * @returns {Promise<{ narrative: string, verdict?: string, sustainability?: string, analysis?: string }>}
  */
 export async function generateComparisonNarrative(player1, player2, deltas) {
-  if (!ai) return 'Comparison narrative unavailable (no AI provider configured).';
+  if (!ai) return { narrative: 'Comparison narrative unavailable (no AI provider configured).' };
+
+  const s1 = player1.stats?.[0] || {};
+  const s2 = player2.stats?.[0] || {};
+  const g1 = s1.goals ?? 0, xg1 = Number(s1.xg ?? 0), a1 = s1.assists ?? 0, xa1 = Number(s1.xa ?? 0), m1 = s1.minutes_played ?? 0;
+  const g2 = s2.goals ?? 0, xg2 = Number(s2.xg ?? 0), a2 = s2.assists ?? 0, xa2 = Number(s2.xa ?? 0), m2 = s2.minutes_played ?? 0;
 
   const completionPromise = ai.chat.completions.create({
     model: AI_MODEL,
     messages: [
       {
         role: 'system',
-        content:
-          'You are a football analyst. In 1–2 sentences, explain who is ahead in form and the key difference between these two players. Use plain language for fans.',
+        content: 'You are an elite football analyst for STATIQ. Compare two players and give a direct verdict. Reference whether either player is overperforming their xG (lucky) or has high xG but low goals (due for a goal). This is the key insight for fantasy managers. Return ONLY valid JSON.',
       },
       {
         role: 'user',
-        content: `Player A: ${player1.name}. Player B: ${player2.name}. Deltas (A vs B): ${JSON.stringify(deltas)}. Who is ahead and in what?`,
+        content: `${player1.name}: ${g1} goals, ${xg1} xG, gap ${g1 - xg1}, ${a1} assists, ${xa1} xA, ${m1} mins\n${player2.name}: ${g2} goals, ${xg2} xG, gap ${g2 - xg2}, ${a2} assists, ${xa2} xA, ${m2} mins\n\nReturn ONLY JSON:\n{"verdict": "One sentence. Name the better pick right now and why.", "sustainability": "One sentence. Who is lucky vs who is due.", "analysis": "2-3 sentences using the actual numbers. Direct."}`,
       },
     ],
-    max_tokens: 120,
+    max_tokens: 280,
   });
 
-  const completion = await withTimeout(
-    completionPromise,
-    AI_TIMEOUT_MS,
-    null
-  );
-  if (!completion) return 'Comparison narrative temporarily unavailable (timeout).';
-  return completion?.choices?.[0]?.message?.content?.trim() || 'No comparison narrative.';
+  const completion = await withTimeout(completionPromise, AI_TIMEOUT_MS, null);
+  if (!completion) return { narrative: 'Comparison narrative temporarily unavailable (timeout).' };
+  const raw = completion?.choices?.[0]?.message?.content?.trim() || '';
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      const verdict = parsed.verdict || '';
+      const sustainability = parsed.sustainability || '';
+      const analysis = parsed.analysis || '';
+      const narrative = [verdict, sustainability, analysis].filter(Boolean).join(' ');
+      return { narrative, verdict, sustainability, analysis };
+    } catch (_) {}
+  }
+  return { narrative: raw || 'No comparison narrative.' };
 }

@@ -364,11 +364,23 @@ export function ComparePage({ preselectedPlayerId }: ComparePageProps) {
 
           <div className="mt-6 rounded-3xl bg-[#111730] p-5 md:p-6">
             <p className="text-sm font-semibold uppercase tracking-[0.25em] text-white/60">
-              Insight
+              AI comparison
             </p>
-            <p className="mt-3 text-sm text-white/80 leading-relaxed">
-              {compareData.narrative}
-            </p>
+            {compareData.verdict && (
+              <p className="mt-3 text-sm font-medium text-white">
+                {compareData.verdict}
+              </p>
+            )}
+            {compareData.sustainability && (
+              <p className="mt-2 text-sm text-emerald-300/90">
+                {compareData.sustainability}
+              </p>
+            )}
+            {(compareData.analysis || compareData.narrative) && (
+              <p className="mt-3 text-sm text-white/80 leading-relaxed">
+                {compareData.analysis || compareData.narrative}
+              </p>
+            )}
           </div>
         </>
       )}

@@ -141,9 +141,21 @@ function removeAccents(str) {
   return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
+/** Known search aliases: short query -> full name to try when DB returns no results */
+const SEARCH_ALIASES = {
+  messi: 'Lionel Messi',
+  ronaldo: 'Cristiano Ronaldo',
+  haaland: 'Erling Haaland',
+  mbappe: 'Kylian Mbappé',
+  vinicius: 'Vinicius Jr',
+  vini: 'Vinicius Jr',
+  bellingham: 'Jude Bellingham',
+  salah: 'Mohamed Salah',
+};
+
 /**
  * Search: Database-only with accent-insensitive matching.
- * Fast search since all 13,000+ players are already imported.
+ * Tries aliases (e.g. "messi" -> "Lionel Messi") when the main query returns nothing.
  * @returns {Promise<{ candidates: object[], source: string }>}
  */
 export async function searchCandidates(searchTerm) {
@@ -151,28 +163,33 @@ export async function searchCandidates(searchTerm) {
   if (!trimmed) return { candidates: [], source: 'none' };
 
   const normalizedTerm = removeAccents(trimmed);
-  
+  const aliasKey = normalizedTerm.toLowerCase().replace(/\s+/g, '');
+  const tryTerm = SEARCH_ALIASES[aliasKey] || trimmed;
+
   // Use first 3 chars for broad DB query, then filter locally for accent matching
-  const prefix = trimmed.slice(0, Math.min(3, trimmed.length));
-  
+  const prefix = tryTerm.slice(0, Math.min(3, tryTerm.length));
+
   const { data: dbResults } = await supabase
     .from('players')
     .select('*')
     .ilike('name', `%${prefix}%`)
     .limit(500);
 
-  // Filter for accent-insensitive match
   const fromDb = (dbResults || []).filter((p) => {
     const normalizedName = removeAccents(p.name || '');
-    return normalizedName.includes(normalizedTerm);
+    return normalizedName.includes(removeAccents(tryTerm));
   });
 
-  // Dedupe and sort
   const byId = new Map();
   for (const p of fromDb) byId.set(p.id, p);
-  const candidates = Array.from(byId.values())
+  let candidates = Array.from(byId.values())
     .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
     .slice(0, 50);
+
+  if (candidates.length === 0 && tryTerm !== trimmed) {
+    const fallback = await searchCandidates(tryTerm);
+    candidates = fallback.candidates;
+  }
 
   return { candidates, source: 'db' };
 }

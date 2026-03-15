@@ -55,7 +55,8 @@ export async function getLeagueMatches(leagueCode = 'PL', status = 'SCHEDULED', 
       stage: m.stage,
       group: m.group,
       venue: m.venue || 'TBD',
-      score: m.score?.fullTime?.home != null 
+      minute: m.minute ?? m.score?.minute ?? null,
+      score: m.score?.fullTime?.home != null
         ? `${m.score.fullTime.home} - ${m.score.fullTime.away}`
         : null,
       competition: league.name,

@@ -68,3 +68,12 @@ CREATE TABLE IF NOT EXISTS nielsen_fan_insights (
   UNIQUE(player_id)
 );
 CREATE INDEX IF NOT EXISTS idx_nielsen_fan_insights_player_id ON nielsen_fan_insights(player_id);
+
+-- HEART: AI insight happiness (thumbs up/down)
+CREATE TABLE IF NOT EXISTS insight_feedback (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  player_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  helpful BOOLEAN NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_insight_feedback_player_id ON insight_feedback(player_id);

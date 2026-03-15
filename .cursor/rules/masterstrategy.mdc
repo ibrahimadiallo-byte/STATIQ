@@ -1,0 +1,19 @@
+---
+description: STATIQ — align all product work with Masterstrategy.md before adding anything
+alwaysApply: true
+---
+
+# Masterstrategy first
+
+Before **adding or changing** user-facing features, flows, copy, metrics, AI behavior, or data visualization:
+
+1. **Read** `Masterstrategy.md` in the repo root (or re-read if it may have changed).
+2. **Check fit** against:
+   - **Personas & journeys** (Marcus, Sarah, David, Leo, Elena) — does the change serve at least one journey without breaking another?
+   - **HEART** — Happiness (insight quality/thumbs), Engagement (Compare), Adoption (time to insight), Retention (match-day use), Task success (search → profile).
+   - **UX laws** — Miller (grouped stats, View more), Jakob (familiar layout), Tesler (complexity in AI/backend), Doherty (skeletons), Aesthetic-Usability (premium dark/lightning feel).
+   - **Data-to-viz rules** — only use chart types and purposes defined there (line / bars / scatter / box / treemap); do not invent new viz types without strategy alignment.
+
+3. If something is **not** in Masterstrategy, note the gap briefly and either stay minimal or ask the user before expanding scope.
+
+Do not ship features that contradict the master strategy without explicit user approval.

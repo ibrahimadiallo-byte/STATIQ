@@ -4,7 +4,7 @@ type TabNavigationProps = {
 };
 
 export function TabNavigation({ activeIndex, onTabChange }: TabNavigationProps) {
-  const tabs = ["EXPLORE", "SEARCH", "STATS", "LINEUP"];
+  const tabs = ["EXPLORE", "SEARCH", "WATCH", "COMPARE"];
 
   return (
     <nav className="px-4 mb-2">
@@ -12,8 +12,9 @@ export function TabNavigation({ activeIndex, onTabChange }: TabNavigationProps) 
         {tabs.map((tab, index) => (
           <button
             key={tab}
+            type="button"
             onClick={() => onTabChange(index)}
-            className={`pb-2 relative text-sm font-semibold tracking-[0.18em] ${
+            className={`min-h-[44px] min-w-[44px] px-2 pb-2 relative text-sm font-semibold tracking-[0.18em] touch-manipulation ${
               index === activeIndex ? "text-white" : "text-white/50"
             }`}
           >
