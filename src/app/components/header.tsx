@@ -1,6 +1,8 @@
 import { User } from "lucide-react";
 
-export function Header() {
+type HeaderProps = { title?: string };
+
+export function Header({ title = "Home" }: HeaderProps) {
   return (
     <header className="flex items-center justify-between px-4 py-4">
       {/* Logo */}
@@ -13,7 +15,7 @@ export function Header() {
       </div>
 
       {/* Title */}
-      <h1 className="text-lg font-semibold tracking-wide">Home</h1>
+      <h1 className="text-xl md:text-2xl font-bold tracking-tight">{title}</h1>
 
       {/* User icon */}
       <button className="w-11 h-11 rounded-full border border-white/10 bg-white/5 flex items-center justify-center">

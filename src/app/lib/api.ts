@@ -59,6 +59,7 @@ export type ProfileResponse = {
 /** Search returns multiple candidates (GET /api/players/search) */
 export type SearchResponse = {
   candidates: Player[];
+  suggestions?: string[];
 };
 
 export type CompareResponse = {
@@ -74,6 +75,9 @@ export type CompareResponse = {
     minutes_played: number;
   };
   narrative: string;
+  verdict?: string;
+  sustainability?: string;
+  analysis?: string;
 };
 
 const FETCH_TIMEOUT_MS = 15000;
